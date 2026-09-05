@@ -3,10 +3,10 @@ import { Adam } from './adam';
 import { Ctx, get } from '../ops/types';
 import { Window } from '../corpus/windows';
 
-export function trainStep(model: GPT, adam: Adam, w: Window): { loss: number; ctx: Ctx; deltas: Map<string, Float64Array> } {
+export function trainStep(model: GPT, adam: Adam, w: Window, wantDeltas = true): { loss: number; ctx: Ctx; deltas: Map<string, Float64Array> } {
   const ctx = model.forward(w.input, w.target);
   model.backward(ctx);
-  const deltas = adam.step(ctx.grads);
+  const deltas = adam.step(ctx.grads, wantDeltas);
   return { loss: get(ctx, T_.loss).data[0], ctx, deltas };
 }
 

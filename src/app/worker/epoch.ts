@@ -24,7 +24,7 @@ export class EpochRunner {
   step(maxWindows: number): { metrics: Metrics } | { diverged: true } | null {
     const end = Math.min(this.order.length, this.pos + maxWindows);
     for (; this.pos < end; this.pos++) {
-      const { loss } = trainStep(this.model, this.adam, this.order[this.pos]);
+      const { loss } = trainStep(this.model, this.adam, this.order[this.pos], false);
       if (!Number.isFinite(loss)) return { diverged: true };
       this.lossSum += loss;
     }
