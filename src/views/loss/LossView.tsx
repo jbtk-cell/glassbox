@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useStore } from '../../app/store';
 import { PARAM_NAMES } from '../../engine/model/params';
-import type { Metrics } from '../../app/worker/protocol';
 
 const TRAIN_COLOR = '#b2182b';
 const TEST_COLOR = '#2166ac';
@@ -51,15 +50,6 @@ function l2norm(data: Float64Array | undefined): number {
 }
 
 /** True when test loss rose and train loss fell on every step of the last 5 history entries. */
-function isOverfitting(history: Metrics[]): boolean {
-  if (history.length < 5) return false;
-  const last5 = history.slice(-5);
-  for (let i = 1; i < last5.length; i++) {
-    if (!(last5[i].testLoss > last5[i - 1].testLoss)) return false;
-    if (!(last5[i].trainLoss < last5[i - 1].trainLoss)) return false;
-  }
-  return true;
-}
 
 function Axes({ yTicks, xTicks: xt, xOf, yOf }: {
   yTicks: { y: number; label: string }[]; xTicks: { x: number; label: string }[];
@@ -118,7 +108,6 @@ export function LossView() {
   const lossXTicks = xTicks(iterations, X_TICKS).map(it => ({ x: it, label: String(it) }));
   const lossYOf = (v: number) => lossY(v) ?? PAD_T + PLOT_H;
 
-  const overfitting = isOverfitting(history);
 
   // ---- Accuracy chart ----
   const accY = (v: number): number | null => (isNum(v) ? PAD_T + PLOT_H - (v / 100) * PLOT_H : null);
@@ -152,10 +141,7 @@ export function LossView() {
           <span style={{ color: TRAIN_COLOR }}>train loss {fmt2(latest.trainLoss)}</span>
           <span style={{ color: TEST_COLOR }}>test loss {fmt2(latest.testLoss)}</span>
         </div>
-        {overfitting && (
-          <p>The model is memorising the training text: training loss keeps falling while test loss rises. This is overfitting.</p>
-        )}
-      </section>
+              </section>
 
       <section>
         <h3>Accuracy</h3>

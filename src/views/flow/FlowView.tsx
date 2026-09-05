@@ -91,17 +91,18 @@ export function FlowView() {
     const rr = (x: number, y: number, ww: number, hh: number, rad: number) => { g.beginPath(); g.roundRect(x, y, ww, hh, rad); };
 
     // Groups.
-    const drawGroup = (id: string) => {
+    const drawGroup = (id: string, withLabel: boolean) => {
       const grp = layout.groups.find(x => x.id === id)!; const r = R(grp.rect);
       rr(r.x, r.y, r.w, r.h, 10 * Z + 4);
       g.fillStyle = id === 'block' ? 'rgba(217,119,6,0.05)' : 'rgba(0,0,0,0.025)'; g.fill();
       g.strokeStyle = id === 'block' ? 'rgba(217,119,6,0.5)' : 'rgba(0,0,0,0.18)'; g.lineWidth = id === 'block' ? 1.5 : 1; g.stroke();
+      if (!withLabel) return;
       g.font = `${Z < COLLAPSE_ZOOM ? 16 : 13}px system-ui`; g.textAlign = 'left'; g.textBaseline = 'top';
       const tw = g.measureText(grp.label).width;
       g.fillStyle = 'rgba(250,250,249,0.9)'; g.fillRect(r.x + 4, r.y + 3, tw + 10, 18);
       g.fillStyle = id === 'block' ? '#b45309' : INK; g.fillText(grp.label, r.x + 9, r.y + 5);
     };
-    for (const id of ['embedding', 'block', 'attention', 'ff', 'unembedding', 'output']) if (layout.groups.some(x => x.id === id)) drawGroup(id);
+    for (const id of ['embedding', 'block', 'attention', 'ff', 'unembedding', 'output']) if (layout.groups.some(x => x.id === id)) drawGroup(id, Z >= 0.3 || (id !== 'attention' && id !== 'ff'));
 
     // Token strip.
     const strip = R(layout.tokenStrip); const T = trace.ctx.T; const bw = strip.w / Math.max(T, 1);

@@ -14,14 +14,16 @@ It is a browser recreation of the "Tiny Language Model" simulation in [Simbrain]
 
 ## How to use it
 
-1. Pick a preset or paste your own text, then press **Use this text**.
-2. Press **Train**. The Train panel shows loss and accuracy; the Loss view shows the curves. Press **Stop** when training accuracy is high and test accuracy has stalled. That gap is overfitting.
-3. Type a prompt and press **Predict next word**. The Flow view shows the computation that produced the prediction.
-4. Step through it with `F` and `B` (or the arrow keys), or press Play. The active operation glows; operations that have not run yet are dimmed. Scroll to zoom into any tile until the numbers appear; hover a cell to read it.
-5. Press `T` to record one training step. Stepping backwards through it shows the gradient flowing into every tile, then the Adam update to every weight.
-6. Click a weight and edit it in the Inspector. The prediction re-runs as soon as you do.
+The layout follows Simbrain's: a toolbar, a Text Inputs window, a Language Model Controls panel, and the Network beside them. Training and model settings live in dialogs.
 
-Views: **Flow** (tiles and wires), **Network** (every neuron and connection for one position), **Math** (the formula for the current operation with the real numbers substituted), **Loss** (curves and gradient sizes).
+1. **Model...** picks the training text (a preset, or paste your own) and the model sizes, then **Create**.
+2. **Train...** opens the Train Network dialog: press **Train**, watch the loss and accuracy curves, press **Stop** when training accuracy is high and test accuracy has stalled. That gap is overfitting.
+3. Click in Text Inputs and type a few words. **Step** predicts the next word and adds it; **Play** keeps going. The Network shows the computation that produced each word.
+4. Under the Network, the operation bar steps that computation one operation at a time: `F` and `B`, or the buttons. The active operation glows; operations that have not run yet are dimmed. Scroll to zoom into any tile until the numbers appear; hover a cell to read it; click a cell for its details.
+5. **Training step** (or `T`) records one training step. Stepping backwards through it shows the gradient flowing into every tile, then the Adam update to every weight.
+6. Click a weight, type a new value in the cell panel, press **Set**. The prediction re-runs as soon as you do.
+
+Tabs above the Network: **Network** (tiles and wires), **Neurons** (every neuron and connection for one position), **Math** (the formula for the current operation with the real numbers substituted), **Loss** (curves and gradient sizes).
 
 ## What you are looking at
 

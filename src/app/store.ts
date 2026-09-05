@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import { GPT } from '../engine/model/gpt';
 import { DEFAULTS, type GPTConfig } from '../engine/model/params';
 import { Adam, ADAM_DEFAULTS } from '../engine/model/adam';
-import { generate, SAMPLE_DEFAULTS, type SampleOpts } from '../engine/model/generate';
+import { generate, sampleFromLogits, SAMPLE_DEFAULTS, type SampleOpts } from '../engine/model/generate';
+import { T_ } from '../engine/model/gpt';
+import { get } from '../engine/ops/types';
 import { recordForward, recordTrainingStep, type Trace } from '../engine/trace/trace';
 import { splitWords, encode } from '../engine/corpus/tokenize';
 import { Rng } from '../engine/rng';
@@ -35,6 +37,7 @@ export interface Actions {
   setView(v: View): void; select(c: CellRef | null): void; setHover(c: CellRef | null): void; setPosition(t: number): void;
   editParam(name: string, index: number, value: number): void;
   generateMore(n: number): void;
+  stepGenerate(): void;              // predict one token from the context, append it, show that forward pass
   startTraining(): void; stopTraining(): void;
   _onProgress(m: Metrics): void; _onParams(p: Record<string, number[]>): void; _onTrainError(msg: string): void;
 }
@@ -48,6 +51,8 @@ export const initialData: Data = {
   prompt: '', promptUnknown: [], generated: null,
   view: 'flow', selection: null, hover: null, position: 0,
 };
+
+const get_ = (tr: Trace, name: string) => get(tr.ctx, name);
 
 let trainer: Trainer | null = null;
 let trainerStale = true;   // main-thread params changed since the worker last saw them
@@ -137,6 +142,18 @@ export const useStore = create<State>()((set, get) => {
       trainerStale = true;
       if (trace) set({ trace: rerecord(model, trace, lr) });
       else set({});
+    },
+    stepGenerate: () => {
+      const { model, corpus, prompt, sample, config, nonce } = get();
+      if (!model || !corpus) return;
+      const { tokens, unknown } = promptTokens(prompt, corpus);
+      if (tokens.length === 0) { set({ promptUnknown: unknown }); return; }
+      const trace = recordForward(model, tokens.slice(-config.contextSize));
+      const L = get_(trace, T_.logits); const [rows, V] = L.shape;
+      const { token } = sampleFromLogits(Float64Array.from(L.data.subarray((rows - 1) * V, rows * V)), sample, new Rng(config.seed * 7919 + nonce));
+      const word = corpus.vocab.words[token];
+      const glue = word === '\n' ? '' : prompt.endsWith('\n') || prompt.length === 0 ? '' : ' ';
+      set({ trace, cursorIndex: trace.steps.length - 1, prompt: prompt + glue + word, promptUnknown: unknown, nonce: nonce + 1, position: trace.ctx.T - 1, selection: null, hover: null });
     },
     generateMore: n => {
       const { model, corpus, prompt, sample, config, nonce } = get();

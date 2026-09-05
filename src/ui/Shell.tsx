@@ -1,56 +1,72 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useStore, type View } from '../app/store';
 import { useKeys } from '../app/keys';
-import { TextPanel } from './TextPanel';
-import { TrainPanel } from './TrainPanel';
-import { GeneratePanel } from './GeneratePanel';
+import { TextInputs, VocabularyPanel, TrainingTextPanel } from './TextInputs';
+import { LMControls } from './LMControls';
 import { Transport } from './Transport';
-import { Inspector } from './Inspector';
+import { CellPanel } from './CellPanel';
+import { TrainDialog } from './TrainDialog';
+import { ModelDialog } from './ModelDialog';
 import { FlowView } from '../views/flow/FlowView';
 import { NetworkView } from '../views/network/NetworkView';
 import { MathView } from '../views/math/MathView';
 import { LossView } from '../views/loss/LossView';
+import { splitWords } from '../engine/corpus/tokenize';
 
-const VIEWS: { id: View; label: string; hint: string }[] = [
-  { id: 'flow', label: 'Flow', hint: 'The computation as tiles and wires. Scroll to zoom, drag to pan.' },
-  { id: 'network', label: 'Network', hint: 'Every neuron and every connection for one position.' },
-  { id: 'math', label: 'Math', hint: 'The formula for the current operation, with the real numbers.' },
-  { id: 'loss', label: 'Loss', hint: 'Training and test loss, accuracy, and gradient sizes.' },
-];
+const VIEWS: { id: View; label: string }[] = [{ id: 'flow', label: 'Network' }, { id: 'network', label: 'Neurons' }, { id: 'math', label: 'Math' }, { id: 'loss', label: 'Loss' }];
 
 export function Shell() {
   const view = useStore(s => s.view), setView = useStore(s => s.setView);
+  const prompt = useStore(s => s.prompt), setPrompt = useStore(s => s.setPrompt), stepGenerate = useStore(s => s.stepGenerate);
+  const model = useStore(s => s.model), training = useStore(s => s.training);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(5);
+  const [dialog, setDialog] = useState<'train' | 'model' | null>(null);
+  const [showVocab, setShowVocab] = useState(false), [showText, setShowText] = useState(false);
   const togglePlay = useCallback(() => setPlaying(p => !p), []);
   useKeys(togglePlay);
+  const tokens = splitWords(prompt).length;
+
+  useEffect(() => {
+    if (!playing) return;
+    const id = setInterval(() => { const s = useStore.getState(); if (!s.model || splitWords(s.prompt).length === 0 || splitWords(s.prompt).length > 400) setPlaying(false); else s.stepGenerate(); }, 350);
+    return () => clearInterval(id);
+  }, [playing]);
 
   return (
-    <div className="shell">
-      <header className="top">
-        <h1>glassbox</h1>
-        <p>A tiny GPT you can train on your own text and step through one operation at a time. Nothing leaves your browser.</p>
-        <a href="https://github.com/jbtk-cell/glassbox" target="_blank" rel="noreferrer">Source</a>
-      </header>
-      <div className="left">
-        <TextPanel />
-        <TrainPanel />
-        <GeneratePanel />
+    <div className="workspace">
+      <div className="toolbar">
+        <span className="app">glassbox</span>
+        <button onClick={stepGenerate} disabled={!model || tokens === 0} title="Predict the next word and add it">Step</button>
+        <button onClick={togglePlay} disabled={!model || tokens === 0} title="Keep predicting">{playing ? 'Stop' : 'Play'}</button>
+        <button onClick={() => { setPlaying(false); setPrompt(''); }} disabled={tokens === 0}>Clear</button>
+        <span className="readout">Tokens: {tokens}</span>
+        <span className="spacer" />
+        <button onClick={() => setDialog('train')} disabled={!model}>{training === 'running' ? 'Training...' : 'Train...'}</button>
+        <button onClick={() => setDialog('model')}>Model...</button>
       </div>
-      <main className="centre">
-        <nav className="tabs">
-          {VIEWS.map(v => <button key={v.id} className={view === v.id ? 'active' : ''} title={v.hint} onClick={() => setView(v.id)}>{v.label}</button>)}
-          <span className="hint">{VIEWS.find(v => v.id === view)?.hint}</span>
-        </nav>
-        <div className="view">
-          {view === 'flow' && <FlowView />}
-          {view === 'network' && <NetworkView />}
-          {view === 'math' && <MathView />}
-          {view === 'loss' && <LossView />}
+      <div className="desk">
+        <div className="column">
+          <TextInputs />
+          <LMControls showVocab={showVocab} setShowVocab={setShowVocab} showText={showText} setShowText={setShowText} />
+          {showVocab && <VocabularyPanel />}
+          {showText && <TrainingTextPanel />}
         </div>
-      </main>
-      <Transport playing={playing} setPlaying={setPlaying} speed={speed} setSpeed={setSpeed} />
-      <Inspector />
+        <section className="frame network">
+          <div className="titlebar">
+            <span className="tabs">{VIEWS.map(v => <button key={v.id} className={view === v.id ? 'active' : ''} onClick={() => setView(v.id)}>{v.label}</button>)}</span>
+          </div>
+          <div className="view">
+            {view === 'flow' && <FlowView />}
+            {view === 'network' && <NetworkView />}
+            {view === 'math' && <MathView />}
+            {view === 'loss' && <div className="loss-wrap"><LossView /></div>}
+            <CellPanel />
+          </div>
+          <Transport />
+        </section>
+      </div>
+      {dialog === 'train' && <TrainDialog onClose={() => setDialog(null)} />}
+      {dialog === 'model' && <ModelDialog onClose={() => setDialog(null)} />}
     </div>
   );
 }

@@ -67,6 +67,12 @@ describe('store: worker messages and generation', () => {
     S()._onParams(p);
     expect(S().model!.params.get('b_q')!.data[0]).toBe(42);
   });
+  it('stepGenerate appends one word to the context and records that pass', () => {
+    S().setPrompt('w1 w2'); S().stepGenerate();
+    expect(S().prompt.split(/\s+/).length).toBe(3);
+    expect(S().trace!.kind).toBe('forward'); expect(S().cursorIndex).toBe(20);
+    S().stepGenerate(); expect(S().prompt.split(/\s+/).length).toBe(4);
+  });
   it('generateMore returns the prompt followed by n tokens', () => {
     S().setPrompt('w1 w2'); S().generateMore(5);
     expect(S().generated!.length).toBe(7); expect(S().generated!.slice(0, 2)).toEqual([1 + 0, 1 + 1].map(() => expect.any(Number)));

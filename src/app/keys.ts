@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from './store';
 
-/** Global keyboard bindings, ignored while typing in a form control. */
+/** Global keys, ignored while typing in a form control. F/B step operations; T records a training step; Space toggles generation. */
 export function useKeys(togglePlay: () => void) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
