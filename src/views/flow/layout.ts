@@ -13,7 +13,7 @@ export interface FlowLayout {
   bounds: TileRect; byId: Map<string, LayoutNode>; tokenStrip: TileRect;
 }
 
-const PILL_W = 120, PILL_H = 28, GAP = 24, RIGHT_X = 260, RAIL_X = -260, PAD = 60;
+const PILL_W = 120, PILL_H = 28, GAP = 24, RIGHT_X = 300, PARAM_COL = 170, RAIL_X = -260, PAD = 60;
 
 /** Fixed on-screen box for a tensor; cells may be non-square so big vocabularies stay readable. */
 export function tileBox(name: string, shape: number[]): { w: number; h: number } {
@@ -72,7 +72,6 @@ export function flowLayout(ops: Op[], shapes: Record<string, number[]>): FlowLay
   const levels = levelsFor(shapes['loss'] !== undefined).filter(l => opById.has(l.opId));
   const tokenStrip: TileRect = { x: -220, y: -60, w: 440, h: 40 };
   let y = tokenStrip.y - GAP;        // running top edge of the spine, moving upward (decreasing)
-  let ry = y;                        // running top edge of the right-hand parameter column
   const groupMembers = new Map<string, LayoutNode[]>();
   const member = (g: string, n: LayoutNode) => { (groupMembers.get(g) ?? groupMembers.set(g, []).get(g)!).push(n); };
 
@@ -97,17 +96,21 @@ export function flowLayout(ops: Op[], shapes: Record<string, number[]>): FlowLay
         const rail = (op.id === 'residual1' && inp === 'x0') || (op.id === 'residual2' && inp === 'x1');
         edges.push({ from: 't:' + inp, to: pill.id, rail });
       }
+      // Parameters sit beside their own row, one sub-column per op, biases stacked above their matrix.
+      const sub = row.indexOf(lv);
+      let ptop = rowTop - PILL_H;
       for (const p of op.params) {
         const pshape = shapes[p];
         if (!pshape) throw new Error(`flowLayout: no shape for parameter '${p}'`);
         const pbox = tileBox(p, pshape);
-        const top = Math.min(ry, rowTop) - pbox.h;
+        ptop -= pbox.h;
         const pn = add({ id: 't:' + p, kind: 'param', key: 't:' + p, label: p, shape: pshape, group: lv.group,
-          rect: { x: RIGHT_X, y: top, w: pbox.w, h: pbox.h } });
+          rect: { x: RIGHT_X + sub * PARAM_COL, y: ptop, w: pbox.w, h: pbox.h } });
         member(lv.group, pn);
-        ry = top - 12;
+        ptop -= 14;
         edges.push({ from: pn.id, to: pill.id });
       }
+      rowHeight = Math.max(rowHeight, rowTop - ptop);
       edges.push({ from: pill.id, to: tile.id });
     }
     y = rowTop - rowHeight - GAP;
@@ -129,7 +132,8 @@ export function flowLayout(ops: Op[], shapes: Record<string, number[]>): FlowLay
     { id: 'unembedding', label: 'Unembedding', rect: groupRect(['unembedding'], 20) },
     { id: 'output', label: 'Output', rect: groupRect(['output'], 20) },
   ];
-  groups.splice(1, 0, { id: 'block', label: 'Transformer block', rect: pad(union(groups.filter(g => g.parent === 'block').map(g => g.rect)), 24) });
+  const blockInner = union(groups.filter(g => g.parent === 'block').map(g => g.rect));
+  groups.splice(1, 0, { id: 'block', label: 'Transformer block', rect: { x: blockInner.x - 24, y: blockInner.y - 44, w: blockInner.w + 48, h: blockInner.h + 68 } });
   // Widen groups to include the rail lane so rails are drawn inside the block.
   for (const g of groups) if (g.id === 'block' || g.parent === 'block') { const right = g.rect.x + g.rect.w; g.rect.x = Math.min(g.rect.x, RAIL_X - 20); g.rect.w = right - g.rect.x; }
 
