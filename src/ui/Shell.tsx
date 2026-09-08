@@ -7,7 +7,7 @@ import { Transport } from './Transport';
 import { CellPanel } from './CellPanel';
 import { TrainDialog } from './TrainDialog';
 import { ModelDialog } from './ModelDialog';
-import { FlowView } from '../views/flow/FlowView';
+import { MapView } from '../views/map/MapView';
 import { NetworkView } from '../views/network/NetworkView';
 import { MathView } from '../views/math/MathView';
 import { LossView } from '../views/loss/LossView';
@@ -56,7 +56,7 @@ export function Shell() {
             <span className="tabs">{VIEWS.map(v => <button key={v.id} className={view === v.id ? 'active' : ''} onClick={() => setView(v.id)}>{v.label}</button>)}</span>
           </div>
           <div className="view">
-            {view === 'flow' && <FlowView />}
+            {view === 'flow' && <MapView />}
             {view === 'network' && <NetworkView />}
             {view === 'math' && <MathView />}
             {view === 'loss' && <div className="loss-wrap"><LossView /></div>}

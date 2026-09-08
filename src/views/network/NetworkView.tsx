@@ -9,9 +9,30 @@ import { T_ } from '../../engine/model/gpt';
 import { diverging, sequential, maxAbs, type RGB } from '../colormap';
 import { networkLayout, COMPACT_THRESHOLD, type NetColumn, type NetWire } from './networkLayout';
 
-const MAX_WIRES = 2000;
 const COMPACT_HALF_W = 12;
 const TOP_LABELS = 8;
+const FOCUS_WIRES = 150;
+
+const CAPTIONS: Record<string, string> = {
+  [T_.tok]: 'word row',
+  [T_.pos]: 'position row',
+  [T_.x0]: 'sum',
+  [T_.h1]: 'tidied',
+  [T_.q]: 'question',
+  [T_.k]: 'label',
+  [T_.v]: 'content',
+  [T_.ctxv]: 'mix',
+  [T_.attn_out]: 'written back',
+  [T_.x1]: 'after attention',
+  [T_.h2]: 'tidied',
+  [T_.ff_pre]: 'hidden',
+  [T_.ff_act]: 'after ReLU',
+  [T_.ff_out]: 'FF output',
+  [T_.x2]: 'block output',
+  [T_.hf]: 'tidied',
+  [T_.logits]: 'scores',
+  [T_.probs]: 'probabilities',
+};
 
 interface WireGeom { param: string; from: string; to: string; i: number; j: number; x1: number; y1: number; x2: number; y2: number; w: number; maxW: number }
 
@@ -37,8 +58,7 @@ function buildWireGeoms(tensors: Map<string, { data: Float64Array }>, columns: N
       }
     }
   }
-  if (all.length <= MAX_WIRES) return all;
-  return [...all].sort((a, b) => Math.abs(b.w) - Math.abs(a.w)).slice(0, MAX_WIRES);
+  return all;
 }
 
 function hitNeuron(columns: NetColumn[], mx: number, my: number): { col: NetColumn; i: number } | null {
@@ -76,6 +96,7 @@ export function NetworkView() {
   const trace = useStore(s => s.trace);
   const cursorIndex = useStore(s => s.cursorIndex);
   const selection = useStore(s => s.selection);
+  const hover = useStore(s => s.hover);
   const position = useStore(s => s.position);
   const select = useStore(s => s.select);
   const setHover = useStore(s => s.setHover);
@@ -85,6 +106,7 @@ export function NetworkView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [tip, setTip] = useState<Tip | null>(null);
+  const drawnWiresRef = useRef<WireGeom[]>([]);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -143,18 +165,43 @@ export function NetworkView() {
       }
     }
 
+    // Resolve the hovered neuron the same way.
+    let hovCol: string | null = null, hovIdx: number | null = null;
+    if (hover) {
+      const name = hover.key.startsWith('t:') ? hover.key.slice(2) : hover.key;
+      const col = layout.columns.find(c => c.key === name);
+      if (col) {
+        const idx = hover.index - position * col.n;
+        if (idx >= 0 && idx < col.n) { hovCol = name; hovIdx = idx; }
+      }
+    }
+
+    // Focus: hover takes priority over selection.
+    const focusCol = hovCol !== null ? hovCol : selCol;
+    const focusIdx = hovCol !== null ? hovIdx : selIdx;
+
     // Wires.
-    for (const w of wireGeoms) {
-      const isFan = selCol !== null && ((w.from === selCol && w.i === selIdx) || (w.to === selCol && w.j === selIdx));
-      const alpha = selCol === null ? 0.6 : (isFan ? 0.6 : 0.1);
-      const width = 0.5 + 3 * (w.maxW === 0 ? 0 : Math.abs(w.w) / w.maxW);
+    const wireRatio = (w: WireGeom) => (w.maxW === 0 ? 0 : Math.abs(w.w) / w.maxW);
+    const drawWire = (w: WireGeom, alpha: number) => {
       ctx.strokeStyle = rgba(diverging(w.w, w.maxW), alpha);
-      ctx.lineWidth = width;
+      ctx.lineWidth = 0.5 + 3 * wireRatio(w);
       ctx.beginPath();
       ctx.moveTo(w.x1, w.y1);
       ctx.lineTo(w.x2, w.y2);
       ctx.stroke();
+    };
+    const strongest = [...wireGeoms].sort((a, b) => wireRatio(b) - wireRatio(a)).slice(0, FOCUS_WIRES);
+    let drawnWires: WireGeom[];
+    if (focusCol === null) {
+      for (const w of strongest) drawWire(w, 0.35);
+      drawnWires = strongest;
+    } else {
+      for (const w of strongest) drawWire(w, 0.06);
+      const focusWires = wireGeoms.filter(w => (w.from === focusCol && w.i === focusIdx) || (w.to === focusCol && w.j === focusIdx));
+      for (const w of focusWires) drawWire(w, 0.85);
+      drawnWires = [...strongest, ...focusWires];
     }
+    drawnWiresRef.current = drawnWires;
 
     // Columns.
     const words = useStore.getState().corpus?.vocab.words;
@@ -181,11 +228,23 @@ export function NetworkView() {
       ctx.font = '10px sans-serif';
       ctx.fillStyle = `rgba(60, 60, 60, ${alpha})`;
       ctx.textAlign = 'center';
-      ctx.fillText(name, col.x, col.y0 - 12);
+      ctx.fillText(name, col.x, col.y0 - 22);
+      ctx.font = '9px sans-serif';
+      ctx.fillStyle = `rgba(110, 110, 110, ${alpha})`;
+      ctx.fillText(CAPTIONS[name] ?? '', col.x, col.y0 - 11);
 
       if (compact) {
         const order = [...Array(rowN).keys()].sort((a, b) => tensor.data[position * rowN + b] - tensor.data[position * rowN + a]);
-        const top = new Set(order.slice(0, TOP_LABELS));
+        const top = new Set<number>();
+        const labelledYs: number[] = [];
+        for (const idx of order) {
+          if (top.size >= TOP_LABELS) break;
+          const y = col.y0 + idx * col.dy;
+          if (labelledYs.every(ly => Math.abs(ly - y) >= 10)) {
+            top.add(idx);
+            labelledYs.push(y);
+          }
+        }
         for (let i = 0; i < rowN; i++) {
           const v = tensor.data[position * rowN + i];
           const rgb = name === T_.probs ? sequential(v) : diverging(v, colMaxAbs);
@@ -205,7 +264,7 @@ export function NetworkView() {
           const v = tensor.data[position * rowN + i];
           const rgb = name === T_.probs ? sequential(v) : diverging(v, colMaxAbs);
           const cy = col.y0 + i * col.dy;
-          const highlighted = selCol === name && selIdx === i;
+          const highlighted = focusCol === name && focusIdx === i;
           ctx.beginPath();
           ctx.fillStyle = rgba(rgb, alpha);
           ctx.arc(col.x, cy, col.r, 0, Math.PI * 2);
@@ -245,7 +304,7 @@ export function NetworkView() {
         ctx.stroke();
       }
     }
-  }, [trace, layout, wireGeoms, cursorIndex, selection, position, size, T]);
+  }, [trace, layout, wireGeoms, cursorIndex, selection, hover, position, size, T]);
 
   if (!trace) {
     return <div className="network-view network-view--empty">Predict a word or record a training step to see the network.</div>;
@@ -265,7 +324,7 @@ export function NetworkView() {
       setHover({ key: tKey(col.key), index: position * col.n + i });
       return;
     }
-    const wire = hitWire(wireGeoms, mx, my);
+    const wire = hitWire(drawnWiresRef.current, mx, my);
     if (wire) {
       setTip({ x: e.clientX, y: e.clientY, text: `${wire.param}[${wire.i}, ${wire.j}] = ${fmt(wire.w)}` });
       setHover(null);
