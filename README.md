@@ -17,13 +17,13 @@ It is a browser recreation of the "Tiny Language Model" simulation in [Simbrain]
 The layout follows Simbrain's: a toolbar, a Text Inputs window, a Language Model Controls panel, and the Network beside them. Training and model settings live in dialogs.
 
 1. **Model...** picks the training text (a preset, or paste your own) and the model sizes, then **Create**.
-2. **Train...** opens the Train Network dialog: press **Train**, watch the loss and accuracy curves, press **Stop** when training accuracy is high and test accuracy has stalled. That gap is overfitting.
+2. In the **Training** panel press **Train**. The iteration count, losses and accuracies update every epoch and the weight tiles in the Network change as it learns. Press **Stop** when training accuracy is high and test accuracy has stalled. That gap is overfitting. The **Loss** tab has the full curves.
 3. Click in Text Inputs and type a few words. **Step** predicts the next word and adds it; **Play** keeps going. The Network shows the computation that produced each word.
 4. Under the Network, the Computation bar steps that computation one operation at a time: `F` and `B`, or the buttons. The tile being computed glows; tiles that have not been computed yet are dimmed. Scroll or use the zoom buttons to zoom into any tile until the numbers appear; hover a cell to read it; click a cell for its details.
 5. **Record training step** (or `T`) records one training step. Stepping backwards through it shows the gradient flowing into every tile, then the Adam update to every weight.
 6. Click a weight, type a new value in the cell panel, press **Set**. The prediction re-runs as soon as you do.
 
-Tabs above the Network: **Network** (Simbrain's map: Inputs, Embedding, the Transformer block, Unembedding, and a circle per word for the predicted next token), **Neurons** (every neuron for one position; hover one to see its connections), **Math** (the formula for the current operation with the real numbers substituted), **Loss** (curves and gradient sizes).
+Tabs above the Network: **Network** (Simbrain's map: Inputs, Embedding, the Transformer block, Unembedding, and a circle per word for the predicted next token), **Neurons** (one position's numbers as columns of circles, every column joined to the next by the step that produces it; hover a circle to see its wires, click a word above to change position), **Explain** (a walk through every step in plain words, with the formula and the real numbers for the selected cell), **Loss** (curves and gradient sizes).
 
 ## What you are looking at
 

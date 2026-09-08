@@ -5,22 +5,22 @@ import { TextInputs, VocabularyPanel, TrainingTextPanel } from './TextInputs';
 import { LMControls } from './LMControls';
 import { Transport } from './Transport';
 import { CellPanel } from './CellPanel';
-import { TrainDialog } from './TrainDialog';
+import { TrainingPanel } from './TrainingPanel';
 import { ModelDialog } from './ModelDialog';
 import { MapView } from '../views/map/MapView';
 import { NetworkView } from '../views/network/NetworkView';
-import { MathView } from '../views/math/MathView';
+import { ExplainView } from '../views/explain/ExplainView';
 import { LossView } from '../views/loss/LossView';
 import { splitWords } from '../engine/corpus/tokenize';
 
-const VIEWS: { id: View; label: string }[] = [{ id: 'flow', label: 'Network' }, { id: 'network', label: 'Neurons' }, { id: 'math', label: 'Math' }, { id: 'loss', label: 'Loss' }];
+const VIEWS: { id: View; label: string }[] = [{ id: 'flow', label: 'Network' }, { id: 'network', label: 'Neurons' }, { id: 'math', label: 'Explain' }, { id: 'loss', label: 'Loss' }];
 
 export function Shell() {
   const view = useStore(s => s.view), setView = useStore(s => s.setView);
   const prompt = useStore(s => s.prompt), setPrompt = useStore(s => s.setPrompt), stepGenerate = useStore(s => s.stepGenerate);
-  const model = useStore(s => s.model), training = useStore(s => s.training);
+  const model = useStore(s => s.model);
   const [playing, setPlaying] = useState(false);
-  const [dialog, setDialog] = useState<'train' | 'model' | null>(null);
+  const [dialog, setDialog] = useState<'model' | null>(null);
   const [showVocab, setShowVocab] = useState(false), [showText, setShowText] = useState(false);
   const togglePlay = useCallback(() => setPlaying(p => !p), []);
   useKeys(togglePlay);
@@ -41,13 +41,13 @@ export function Shell() {
         <button onClick={() => { setPlaying(false); setPrompt(''); }} disabled={tokens === 0}>Clear</button>
         <span className="readout">Tokens: {tokens}</span>
         <span className="spacer" />
-        <button onClick={() => setDialog('train')} disabled={!model}>{training === 'running' ? 'Training...' : 'Train...'}</button>
         <button onClick={() => setDialog('model')}>Model...</button>
       </div>
       <div className="desk">
         <div className="column">
           <TextInputs />
           <LMControls showVocab={showVocab} setShowVocab={setShowVocab} showText={showText} setShowText={setShowText} />
+          <TrainingPanel />
           {showVocab && <VocabularyPanel />}
           {showText && <TrainingTextPanel />}
         </div>
@@ -58,14 +58,13 @@ export function Shell() {
           <div className="view">
             {view === 'flow' && <MapView />}
             {view === 'network' && <NetworkView />}
-            {view === 'math' && <MathView />}
+            {view === 'math' && <ExplainView />}
             {view === 'loss' && <div className="loss-wrap"><LossView /></div>}
             <CellPanel />
           </div>
           <Transport />
         </section>
       </div>
-      {dialog === 'train' && <TrainDialog onClose={() => setDialog(null)} />}
       {dialog === 'model' && <ModelDialog onClose={() => setDialog(null)} />}
     </div>
   );

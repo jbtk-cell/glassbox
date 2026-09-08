@@ -14,4 +14,4 @@ export type FromWorker =
   | { type: 'params'; params: Record<string, number[]>; iteration: number }
   | { type: 'error'; message: string };
 
-export const PARAMS_EVERY = 5;   // epochs between parameter syncs
+export const PARAMS_EVERY = 1;   // epochs between parameter syncs; 1 so the tiles change while training

@@ -91,7 +91,7 @@ export function mapLayout(shapes: Record<string, number[]>, words?: string[]): M
   const sm = { w: 240, h: T * U };
   const smx = BX - 130 - sm.w;
   const soft = place({ id: 'softmax', label: 'Softmax sequence', kind: 'tensor', tensors: [T_.logits, T_.probs], w: sm.w, h: sm.h }, 'softmax', smx, 40 + (uT.h - sm.h) / 2)!;
-  const loss = place({ id: 'loss', label: 'Loss', kind: 'tensor', tensors: [T_.loss], w: 28, h: 28 }, 'softmax', smx + sm.w + 30, cy(soft.rect) - 14);
+  const loss = place({ id: 'loss', label: 'Loss', kind: 'tensor', tensors: [T_.loss], w: 28, h: 28 }, 'softmax', cx(soft.rect) - 14, soft.rect.y + sm.h + CAP + 10);
   const cols = Math.max(4, Math.min(16, Math.ceil(Math.sqrt((V - 1) * 1.4))));
   const rows = Math.max(1, Math.ceil((V - 1) / cols));
   const predW = cols * PRED_CELL.w;
@@ -116,12 +116,14 @@ export function mapLayout(shapes: Record<string, number[]>, words?: string[]): M
   const G = Object.fromEntries(groups.map(g => [g.id, g.rect]));
 
   // ---- Big arrows between groups. ----
+  // Arrows run tile to tile: word ids into the word table, the tables into the block's Input tile,
+  // the block's Output tile into the unembedding table, and on to the softmax and the prediction.
   const arrows: MapArrow[] = [
-    { from: [cx(G.inputs), G.inputs.y], ctrl: [cx(G.inputs), (G.inputs.y + G.embedding.y + G.embedding.h) / 2], to: [cx(G.inputs), G.embedding.y + G.embedding.h] },
-    { from: [G.embedding.x + G.embedding.w, cy(G.embedding)], ctrl: [BX - 90, cy(G.embedding)], to: [BX, cy(inp.rect) - 30] },
-    { from: [BCX, G.block.y], ctrl: [BCX, (G.block.y + G.unembedding.y + G.unembedding.h) / 2], to: [BCX, G.unembedding.y + G.unembedding.h] },
-    { from: [G.unembedding.x, cy(Uslot.rect)], ctrl: [(G.unembedding.x + G.softmax.x + G.softmax.w) / 2, cy(Uslot.rect)], to: [G.softmax.x + G.softmax.w, cy(soft.rect)] },
-    { from: [G.softmax.x, cy(soft.rect)], ctrl: [(G.softmax.x + G.pred.x + G.pred.w) / 2, cy(soft.rect)], to: [G.pred.x + G.pred.w, cy(soft.rect)] },
+    { from: [cx(inputs.rect), inputs.rect.y - 2], ctrl: [cx(inputs.rect), (inputs.rect.y + E.rect.y + E.rect.h) / 2], to: [cx(E.rect), E.rect.y + E.rect.h + CAP + 2] },
+    { from: [G.embedding.x + G.embedding.w, cy(P.rect)], ctrl: [G.embedding.x + G.embedding.w + 40, cy(inp.rect)], to: [inp.rect.x - 10, cy(inp.rect)] },
+    { from: [cx(out.rect), out.rect.y - 6], ctrl: [cx(out.rect), (out.rect.y + Uslot.rect.y + Uslot.rect.h) / 2], to: [cx(Uslot.rect), Uslot.rect.y + Uslot.rect.h + CAP + 2] },
+    { from: [Uslot.rect.x - 6, cy(Uslot.rect)], ctrl: [(Uslot.rect.x + soft.rect.x + soft.rect.w) / 2, cy(Uslot.rect)], to: [soft.rect.x + soft.rect.w + 8, cy(soft.rect)] },
+    { from: [soft.rect.x - 6, cy(soft.rect)], ctrl: [(soft.rect.x + pred.rect.x + pred.rect.w) / 2, cy(soft.rect)], to: [pred.rect.x + pred.rect.w + 8, cy(soft.rect)] },
   ];
 
   // ---- Thin lines inside the block. ----

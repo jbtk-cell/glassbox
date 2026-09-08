@@ -54,6 +54,8 @@ export function MapView() {
   const setHover = useStore(s => s.setHover);
   const select = useStore(s => s.select);
   const setPosition = useStore(s => s.setPosition);
+  const iterations = useStore(s => s.history.length ? s.history[s.history.length - 1].iteration : 0);
+  const training = useStore(s => s.training);
   const [cam, setCam] = useState<Camera>({ x: 0, y: 0, zoom: 0.5 });
   const [tip, setTip] = useState<Tip | null>(null);
   const cache = useMemo(() => new TileCache(), []);
@@ -79,11 +81,13 @@ export function MapView() {
     if (fittedKind.current !== trace.kind) { fittedKind.current = trace.kind; setCam(fit(layout.bounds, size(), 24)); }
   }, [layout, trace, size]);
 
-  // Follow the active tile when a step moves it out of view.
-  const followedTrace = useRef<Trace | null>(null);
+  // Follow the active tile when a step moves it out of view. Only when the cursor moved within
+  // the same trace: a new trace is fitted instead, and a re-run with nothing changed does nothing.
+  const lastStep = useRef<{ trace: Trace | null; index: number }>({ trace: null, index: -2 });
   useEffect(() => {
     if (!layout || !trace || !model) return;
-    if (followedTrace.current !== trace) { followedTrace.current = trace; return; }
+    const prev = lastStep.current; lastStep.current = { trace, index: cursorIndex };
+    if (prev.trace !== trace || prev.index === cursorIndex) return;
     const step = cursorIndex >= 0 ? trace.steps[cursorIndex] : null; if (!step) return;
     const op = model.ops.find(o => o.id === step.opId); if (!op) return;
     const slot = layout.slots.find(s => s.tensors.includes(op.output)); if (!slot) return;
@@ -229,9 +233,12 @@ export function MapView() {
       g.beginPath(); g.roundRect(x, y - 22, tw, 20, 3); g.fillStyle = TAG_BG; g.fill(); g.strokeStyle = TAG_BORDER; g.lineWidth = 1; g.stroke();
       g.fillStyle = INK; g.textAlign = 'left'; g.fillText(grp.label, x + 8, y - 12);
     }
+    // Iteration counter, bottom left, like Simbrain's.
+    g.fillStyle = training === 'running' ? ACCENT : '#555'; g.font = '13px system-ui'; g.textAlign = 'left'; g.textBaseline = 'bottom';
+    g.fillText(`${iterations} iteration${iterations === 1 ? '' : 's'}${training === 'running' ? '  (training)' : ''}`, 10, h - 8);
     const shownLoss = shownById.get('loss');
-    if (shownLoss && shownLoss.status !== 'pending') { const r = R(layout.slotById.get('loss')!.rect); g.fillStyle = INK; g.font = '11px ui-monospace, monospace'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(`loss ${fmt(trace.ctx.tensors.get(T_.loss)!.data[0])}`, r.x + r.w + 6, r.y + r.h / 2); }
-  }, [trace, layout, model, cursorIndex, selection, hover, cam, words, position, cache, size]);
+    if (shownLoss && shownLoss.status !== 'pending') { const r = R(layout.slotById.get('loss')!.rect); g.fillStyle = INK; g.font = '11px ui-monospace, monospace'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(`loss ${fmt(trace.ctx.tensors.get(T_.loss)!.data[0])}`, r.x + r.w + 8, r.y + r.h / 2); }
+  }, [trace, layout, model, cursorIndex, selection, hover, cam, words, position, cache, size, iterations, training]);
 
   useEffect(() => {
     const el = wrapRef.current; if (!el) return;
@@ -289,7 +296,7 @@ export function MapView() {
   const zoomBy = (f: number) => { const { w, h } = size(); setCam(c => zoomAt(c, w / 2, h / 2, f)); };
 
   return (
-    <div ref={wrapRef} className="map-view" style={{ cursor: drag.current ? 'grabbing' : 'default' }}
+    <div ref={wrapRef} className="map-view" data-cam={`${cam.x.toFixed(1)},${cam.y.toFixed(1)},${cam.zoom.toFixed(4)}`} style={{ cursor: drag.current ? 'grabbing' : 'default' }}
       onMouseMove={onMove} onMouseDown={onDown} onMouseUp={onUp} onMouseLeave={() => { drag.current = null; setHover(null); setTip(null); }} onWheel={onWheel} onDoubleClick={fitAll}>
       <canvas ref={canvasRef} />
       <div className="map-zoom">

@@ -79,3 +79,29 @@ table { border-collapse: collapse; }
 .map-zoom { position: absolute; top: 8px; left: 8px; display: flex; gap: 2px; }
 .map-zoom button { padding: 1px 8px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 .map-view .tip { position: absolute; pointer-events: none; background: rgba(31,41,55,0.92); color: white; font: 12px ui-monospace, Menlo, monospace; padding: 4px 7px; border-radius: 4px; white-space: nowrap; }
+
+.network-view { display: flex; flex-direction: column; }
+.seq-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 6px 8px; border-bottom: 1px solid #e4e4e4; background: #fafafa; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.seq-strip .seq-label { color: #555; font-family: system-ui, sans-serif; margin-right: 6px; }
+.seq-strip button.tok { padding: 0 4px; border-radius: 0; border: 1px solid #777; background: #fff; font: inherit; line-height: 1.5; }
+.seq-strip button.tok.on { background: #f5c26b; border-color: #b45309; }
+.network-view .map-view { flex: 1; min-height: 0; }
+
+.explain-view { display: flex; height: 100%; min-height: 0; }
+.explain-list { width: 230px; flex: none; overflow-y: auto; border-right: 1px solid #e0e0e0; padding: 6px 0; background: #fafafa; }
+.explain-group { padding: 8px 12px 3px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #777; }
+.explain-item { display: block; width: 100%; text-align: left; border: none; border-radius: 0; background: none; padding: 4px 12px 4px 18px; font-size: 12.5px; color: #333; }
+.explain-item:hover { background: #f0f0f0; }
+.explain-item.on { background: #fdebc8; color: #7c3d00; font-weight: 600; }
+.explain-pane { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 28px 24px; line-height: 1.55; font-size: 14px; max-width: 760px; }
+.explain-pane h2 { margin: 2px 0 10px; font-size: 20px; font-weight: 600; }
+.explain-pane h3 { margin: 18px 0 6px; font-size: 14px; color: #555; text-transform: uppercase; letter-spacing: 0.04em; }
+.explain-pane p { margin: 0 0 10px; }
+.explain-kicker { font-size: 12px; color: #888; font-family: ui-monospace, Menlo, monospace; }
+.explain-pane .where { color: #444; background: #f6f6f6; border-left: 3px solid #d9a441; padding: 6px 10px; }
+.explain-pane .note { color: #555; font-size: 13px; }
+.explain-pane .hint { color: #777; font-size: 13px; }
+.explain-block-title { font-size: 12px; color: #666; margin-top: 8px; }
+.explain-pane section { overflow-x: auto; }
+.explain-pane .katex-display { margin: 6px 0 8px; text-align: left; }
+.explain-nav { display: flex; gap: 8px; margin-top: 18px; padding-top: 12px; border-top: 1px solid #e6e6e6; }
