@@ -11,6 +11,7 @@ import type { TraceStep } from '../../engine/trace/trace';
 export function ExplainView() {
   const trace = useStore(s => s.trace), cursorIndex = useStore(s => s.cursorIndex), selection = useStore(s => s.selection);
   const model = useStore(s => s.model), seek = useStore(s => s.seek), next = useStore(s => s.next), prev = useStore(s => s.prev);
+  const setView = useStore(s => s.setView);
   const paramCount = model ? [...model.params.values()].reduce((a, t) => a + t.data.length, 0) : 0;
 
   if (!trace || !model) {
@@ -61,6 +62,7 @@ export function ExplainView() {
       {step.phase === 'backward' && <p className="note">{BACKWARD_NOTE}</p>}
       <p>{step.phase === 'update' ? STEPS.adam_update.text : info?.text ?? op?.explain}</p>
       {(info || step.phase === 'update') && <p className="where"><b>Where to look.</b> {step.phase === 'update' ? STEPS.adam_update.where : info!.where}</p>}
+      <div className="explain-links"><button onClick={() => setView('flow')}>Show in Network</button><button onClick={() => setView('network')}>Show in Neurons</button></div>
       {blocks.length > 0 && <h3>In numbers</h3>}
       {blocks.map((b, i) => <section key={i}>
         <div className="explain-block-title">{b.title}</div>

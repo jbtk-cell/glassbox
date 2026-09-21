@@ -1,5 +1,5 @@
 /** Tensor tiles: world-space rects for tensors, hit-testing, and a cache of tile images. */
-import { diverging, sequential, gradientMap, maxAbs, isMasked, MASK_COLOR, type RGB } from './colormap';
+import { diverging, sequential, gradientMap, robustMax, isMasked, MASK_COLOR, type RGB } from './colormap';
 
 export type TileMode = 'value' | 'prob' | 'grad';
 
@@ -61,7 +61,7 @@ export class TileCache {
     canvas.height = rows;
     const ctx = canvas.getContext('2d') as Canvas2D;
     const img = ctx.createImageData(cols, rows);
-    const m = maxAbs(data);
+    const m = robustMax(data, mode === 'grad' ? 0.95 : 0.99);
     for (let i = 0; i < rows * cols; i++) {
       const [r, g, b] = colorFor(name, mode, data[i], m);
       const o = i * 4;

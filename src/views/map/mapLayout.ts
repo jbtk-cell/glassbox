@@ -5,8 +5,9 @@
 import { T_ } from '../../engine/model/gpt';
 
 export interface Rect { x: number; y: number; w: number; h: number }
+export type CaptionSide = 'below' | 'left' | 'right' | 'above';
 /** A tile that shows one of several tensors: the latest one the cursor has computed. */
-export interface MapSlot { id: string; label: string; kind: 'tensor' | 'param'; tensors: string[]; rect: Rect; group: string }
+export interface MapSlot { id: string; label: string; kind: 'tensor' | 'param'; tensors: string[]; rect: Rect; group: string; caption: CaptionSide }
 export interface MapGroup { id: string; label: string; rect: Rect }
 /** A big arrow between groups: a quadratic curve. */
 export interface MapArrow { from: [number, number]; ctrl: [number, number]; to: [number, number] }
@@ -16,23 +17,25 @@ export interface CircleGrid { rect: Rect; cols: number; rows: number; cellW: num
 export interface InputGrid { rect: Rect; rows: number; cols: number }
 export interface MapLayout {
   slots: MapSlot[]; groups: MapGroup[]; arrows: MapArrow[]; lines: MapLine[];
-  pred: CircleGrid; inputs: InputGrid; bounds: Rect; slotById: Map<string, MapSlot>;
+  pred: CircleGrid; topList: Rect; inputs: InputGrid; bounds: Rect; slotById: Map<string, MapSlot>;
 }
 
 export const U = 4;              // world units per cell in activation and weight tiles
-const CAP = 24;                  // space under a tile for its caption
-const GAP = 22;                  // vertical gap between tiers in the block
+const CAP = 24;                  // space under a tile for a caption below it
+const GAP = 16;                  // vertical gap between tiers in the block
 const PAD = 26;                  // block padding
 const COL_GAP = 56;              // gap between q, k, v columns
 const SIDE_GAP = 44;             // gap between a tile and the weight tile beside it
+const ATTN_MIN = 72;             // the attention tile never gets smaller than this
 export const PRED_CELL = { w: 36, h: 27 };
+export const TOP_LIST = { w: 180, rowH: 22, rows: 8 };
 
 const union = (rs: Rect[]): Rect => {
   const x0 = Math.min(...rs.map(r => r.x)), y0 = Math.min(...rs.map(r => r.y));
   const x1 = Math.max(...rs.map(r => r.x + r.w)), y1 = Math.max(...rs.map(r => r.y + r.h));
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 };
-const grow = (r: Rect, p: number, top = p, bottom = p): Rect => ({ x: r.x - p, y: r.y - top, w: r.w + 2 * p, h: r.h + top + bottom });
+const grow = (r: Rect, p: number, top = p, bottom = p, left = p, right = p): Rect => ({ x: r.x - left, y: r.y - top, w: r.w + left + right, h: r.h + top + bottom });
 const cx = (r: Rect) => r.x + r.w / 2, cy = (r: Rect) => r.y + r.h / 2;
 
 /** Alphabetical order of the vocabulary, id 0 (unknown) excluded. */
@@ -42,7 +45,18 @@ export function predOrder(V: number, words?: string[]): number[] {
   return ids.sort((a, b) => (words[a] ?? '').localeCompare(words[b] ?? ''));
 }
 
-interface Item { id: string; label: string; kind: MapSlot['kind']; tensors: string[]; w: number; h: number }
+interface Item { id: string; label: string; kind: MapSlot['kind']; tensors: string[]; w: number; h: number; caption?: CaptionSide }
+
+/** The rectangle a caption occupies, so groups can make room for it. */
+export function captionBox(slot: MapSlot): Rect {
+  const r = slot.rect; const w = Math.max(60, slot.label.length * 6 + 12), h = CAP;
+  switch (slot.caption) {
+    case 'below': return { x: cx(r) - w / 2, y: r.y + r.h + 2, w, h };
+    case 'above': return { x: cx(r) - w / 2, y: r.y - h - 2, w, h };
+    case 'left': return { x: r.x - w - 6, y: cy(r) - h / 2, w, h };
+    case 'right': return { x: r.x + r.w + 6, y: cy(r) - h / 2, w, h };
+  }
+}
 
 export function mapLayout(shapes: Record<string, number[]>, words?: string[]): MapLayout {
   const need = (n: string) => { const s = shapes[n]; if (!s) throw new Error(`mapLayout: no shape for '${n}'`); return s; };
@@ -51,16 +65,16 @@ export function mapLayout(shapes: Record<string, number[]>, words?: string[]): M
   const place = (it: Item, group: string, x: number, y: number): MapSlot | null => {
     const tensors = it.tensors.filter(t => shapes[t] !== undefined);
     if (tensors.length === 0) return null;
-    const s: MapSlot = { id: it.id, label: it.label, kind: it.kind, tensors, rect: { x, y, w: it.w, h: it.h }, group };
+    const s: MapSlot = { id: it.id, label: it.label, kind: it.kind, tensors, rect: { x, y, w: it.w, h: it.h }, group, caption: it.caption ?? 'below' };
     slots.push(s); slotById.set(s.id, s); return s;
   };
-  const act = (id: string, label: string, tensors: string[], cols = d): Item => ({ id, label, kind: 'tensor', tensors, w: cols * U, h: T * U });
-  const weight = (id: string, label: string, rows: number, cols: number): Item => ({ id, label, kind: 'param', tensors: [id], w: cols * U, h: rows * U });
+  const act = (id: string, label: string, tensors: string[], cols = d, caption?: CaptionSide): Item => ({ id, label, kind: 'tensor', tensors, w: cols * U, h: T * U, caption });
+  const weight = (id: string, label: string, rows: number, cols: number): Item => ({ id, label, kind: 'param', tensors: [id], w: cols * U, h: rows * U, caption: 'right' });
 
   // ---- Transformer block (right column), built top-down in tiers. A tier is a row of tiles
   //      centred on the block's axis, with weight tiles to the right; every tile is centred
   //      vertically in the tier so tall weight tiles never collide with the tier above. ----
-  const BCX = 1230, BY = 250;
+  const BCX = 1230, BY = 300;
   let y = BY + PAD + 8;
   const tier = (main: Item[], side: Item[] = []): MapSlot[] => {
     const rowH = Math.max(...[...main, ...side].map(i => i.h));
@@ -69,68 +83,70 @@ export function mapLayout(shapes: Record<string, number[]>, words?: string[]): M
     for (const it of main) { const s = place(it, 'block', x, y + (rowH - it.h) / 2); if (s) out.push(s); x += it.w + COL_GAP; }
     x += SIDE_GAP - COL_GAP;
     for (const it of side) { const s = place(it, 'block', x, y + (rowH - it.h) / 2); if (s) out.push(s); x += it.w + SIDE_GAP; }
-    y += rowH + CAP + GAP;
+    const belowCaption = main.some(i => (i.caption ?? 'below') === 'below');
+    y += rowH + (belowCaption ? CAP : 8) + GAP;
     return out;
   };
-  const [out] = tier([act('out', 'Output', [T_.x2, T_.hf])]);
-  const [ffOut, W2] = tier([act('ff_out', 'FF Output', [T_.ff_out])], [weight('W_2', 'Hidden -> Output', dFF, d)]);
-  const [ffHid, W1] = tier([act('ff_hid', 'FF Hidden', [T_.ff_pre, T_.ff_act], dFF)], [weight('W_1', 'Input -> Hidden', d, dFF)]);
-  const [ffIn] = tier([act('ff_in', 'FF Input', [T_.x1, T_.h2])]);
+  const [out] = tier([act('out', 'Output', [T_.x2, T_.hf], d, 'left')]);
+  const [ffOut, W2] = tier([act('ff_out', 'FF output', [T_.ff_out])], [weight('W_2', 'Hidden -> output', dFF, d)]);
+  const [ffHid, W1] = tier([act('ff_hid', 'FF hidden', [T_.ff_pre, T_.ff_act], dFF)], [weight('W_1', 'Input -> hidden', d, dFF)]);
+  const [ffIn] = tier([act('ff_in', 'FF input', [T_.x1, T_.h2])]);
   y += 12;
   const [ctx, Wo] = tier([act('ctx', 'Attention output', [T_.ctxv, T_.attn_out])], [weight('W_o', 'Write back', d, d)]);
-  const [attn] = tier([{ id: 'attn', label: 'Attention', kind: 'tensor', tensors: [T_.scores, T_.masked, T_.attn], w: T * U, h: T * U }]);
+  const attnSize = Math.max(T * U, ATTN_MIN);
+  const [attn] = tier([{ id: 'attn', label: 'Attention', kind: 'tensor', tensors: [T_.scores, T_.masked, T_.attn], w: attnSize, h: attnSize }]);
   const [q, k, v] = tier([act('q', 'q', [T_.q]), act('k', 'k', [T_.k]), act('v', 'v', [T_.v])]);
-  const [Wq, Wk, Wv] = tier([weight('W_q', 'Q', d, d), weight('W_k', 'K', d, d), weight('W_v', 'V', d, d)]);
-  const [inp] = tier([act('in', 'Input', [T_.x0, T_.h1])]);
-  const blockRect = grow(union(slots.map(s => s.rect)), PAD, PAD + 8, PAD + CAP - GAP);
+  const [Wq, Wk, Wv] = tier([{ ...weight('W_q', 'Q', d, d), caption: 'below' }, { ...weight('W_k', 'K', d, d), caption: 'below' }, { ...weight('W_v', 'V', d, d), caption: 'below' }]);
+  const [inp] = tier([act('in', 'Input', [T_.x0, T_.h1], d, 'left')]);
+  const blockRect = grow(union(slots.map(s => [s.rect, captionBox(s)]).flat()), PAD, PAD + 8, PAD);
   const BX = blockRect.x;
 
-  // ---- Unembedding above the block; softmax sequence and the prediction grid to the left. ----
+  // ---- Unembedding above the block; probabilities and the prediction to the left. ----
   const uT = { w: 240, h: 100 };
-  const Uslot = place({ id: 'U', label: 'Unembedding', kind: 'param', tensors: ['U'], w: uT.w, h: uT.h }, 'unembedding', BCX - uT.w / 2, 40)!;
-  const sm = { w: 240, h: T * U };
-  const smx = BX - 130 - sm.w;
-  const soft = place({ id: 'softmax', label: 'Softmax sequence', kind: 'tensor', tensors: [T_.logits, T_.probs], w: sm.w, h: sm.h }, 'softmax', smx, 40 + (uT.h - sm.h) / 2)!;
-  const loss = place({ id: 'loss', label: 'Loss', kind: 'tensor', tensors: [T_.loss], w: 28, h: 28 }, 'softmax', cx(soft.rect) - 14, soft.rect.y + sm.h + CAP + 10);
+  const Uslot = place({ id: 'U', label: 'Unembedding', kind: 'param', tensors: ['U'], w: uT.w, h: uT.h, caption: 'right' }, 'unembedding', BCX - uT.w / 2, 40)!;
+  const sm = { w: 240, h: Math.max(T * U, 20) };
+  const smx = BCX - uT.w / 2 - 150 - sm.w;
+  const soft = place({ id: 'softmax', label: 'One probability per word', kind: 'tensor', tensors: [T_.logits, T_.probs], w: sm.w, h: sm.h }, 'probs', smx, 40 + (uT.h - sm.h) / 2)!;
+  place({ id: 'loss', label: 'Loss', kind: 'tensor', tensors: [T_.loss], w: 28, h: 28, caption: 'right' }, 'probs', smx, soft.rect.y + sm.h + CAP + 14);
   const cols = Math.max(4, Math.min(16, Math.ceil(Math.sqrt((V - 1) * 1.4))));
   const rows = Math.max(1, Math.ceil((V - 1) / cols));
-  const predW = cols * PRED_CELL.w;
-  const pred: CircleGrid = { rect: { x: smx - 90 - predW, y: 40, w: predW, h: rows * PRED_CELL.h }, cols, rows, cellW: PRED_CELL.w, cellH: PRED_CELL.h, order: predOrder(V, words) };
+  const listW = TOP_LIST.w, predW = cols * PRED_CELL.w;
+  const topList: Rect = { x: smx - 110 - listW, y: 40, w: listW, h: TOP_LIST.rows * TOP_LIST.rowH + 30 };
+  const pred: CircleGrid = { rect: { x: topList.x - 24 - predW, y: 40, w: predW, h: rows * PRED_CELL.h }, cols, rows, cellW: PRED_CELL.w, cellH: PRED_CELL.h, order: predOrder(V, words) };
 
   // ---- Embedding and Inputs (left column, under the prediction grid). ----
-  const ey = Math.max(pred.rect.y + pred.rect.h + 130, 640);
-  const ex = smx + 20;
-  const E = place({ id: 'E', label: 'Word table', kind: 'param', tensors: ['E'], w: d * U, h: 200 }, 'embedding', ex, ey)!;
-  const P = place({ id: 'P', label: 'Position table', kind: 'param', tensors: ['P'], w: d * U, h: Tmax * U }, 'embedding', ex + d * U + 60, ey + (200 - Tmax * U) / 2)!;
-  const inputs: InputGrid = { rect: { x: ex - 10, y: ey + 200 + CAP + 130, w: 240, h: Math.max(T * 7, 24) }, rows: T, cols: V };
+  const ey = Math.max(pred.rect.y + pred.rect.h + 150, 640);
+  const ex = smx + 10;
+  const E = place({ id: 'E', label: 'Word table', kind: 'param', tensors: ['E'], w: d * U, h: 200, caption: 'left' }, 'embedding', ex, ey)!;
+  const P = place({ id: 'P', label: 'Position table', kind: 'param', tensors: ['P'], w: d * U, h: Tmax * U, caption: 'above' }, 'embedding', ex + d * U + 60, ey + (200 - Tmax * U) / 2 + 12)!;
+  const inputs: InputGrid = { rect: { x: E.rect.x - 40, y: ey + 200 + 150, w: 240, h: Math.max(T * 7, 24) }, rows: T, cols: V };
 
   // ---- Groups. ----
+  const withCaptions = (ids: string[]) => union(ids.flatMap(id => { const s = slotById.get(id); return s ? [s.rect, captionBox(s)] : []; }));
   const groups: MapGroup[] = [
-    { id: 'pred', label: 'Predicted next token', rect: grow(pred.rect, 14, 14, 14 + 26) },
-    { id: 'softmax', label: 'Softmax sequence', rect: grow(union([soft.rect, ...(loss ? [loss.rect] : [])]), 14, 14, 14 + CAP) },
-    { id: 'unembedding', label: 'Unembedding', rect: grow(Uslot.rect, 14, 14, 14 + CAP) },
+    { id: 'pred', label: 'Predicted next token', rect: grow(union([pred.rect, topList]), 14) },
+    { id: 'probs', label: 'Probabilities', rect: grow(withCaptions(['softmax', 'loss']), 14) },
+    { id: 'unembedding', label: 'Unembedding', rect: grow(withCaptions(['U']), 14) },
     { id: 'block', label: 'Transformer block', rect: blockRect },
-    { id: 'embedding', label: 'Embedding', rect: grow(union([E.rect, P.rect]), 20, 20, 20 + CAP) },
+    { id: 'embedding', label: 'Embedding', rect: grow(withCaptions(['E', 'P']), 16, 20, 16) },
     { id: 'inputs', label: 'Inputs', rect: grow(inputs.rect, 14, 14, 14 + CAP) },
   ];
   const G = Object.fromEntries(groups.map(g => [g.id, g.rect]));
 
-  // ---- Big arrows between groups. ----
-  // Arrows run tile to tile: word ids into the word table, the tables into the block's Input tile,
-  // the block's Output tile into the unembedding table, and on to the softmax and the prediction.
+  // ---- Big arrows, tile to tile. ----
   const arrows: MapArrow[] = [
-    { from: [cx(inputs.rect), inputs.rect.y - 2], ctrl: [cx(inputs.rect), (inputs.rect.y + E.rect.y + E.rect.h) / 2], to: [cx(E.rect), E.rect.y + E.rect.h + CAP + 2] },
-    { from: [G.embedding.x + G.embedding.w, cy(P.rect)], ctrl: [G.embedding.x + G.embedding.w + 40, cy(inp.rect)], to: [inp.rect.x - 10, cy(inp.rect)] },
-    { from: [cx(out.rect), out.rect.y - 6], ctrl: [cx(out.rect), (out.rect.y + Uslot.rect.y + Uslot.rect.h) / 2], to: [cx(Uslot.rect), Uslot.rect.y + Uslot.rect.h + CAP + 2] },
-    { from: [Uslot.rect.x - 6, cy(Uslot.rect)], ctrl: [(Uslot.rect.x + soft.rect.x + soft.rect.w) / 2, cy(Uslot.rect)], to: [soft.rect.x + soft.rect.w + 8, cy(soft.rect)] },
-    { from: [soft.rect.x - 6, cy(soft.rect)], ctrl: [(soft.rect.x + pred.rect.x + pred.rect.w) / 2, cy(soft.rect)], to: [pred.rect.x + pred.rect.w + 8, cy(soft.rect)] },
+    { from: [cx(inputs.rect), inputs.rect.y - 4], ctrl: [cx(inputs.rect), (inputs.rect.y + E.rect.y + E.rect.h) / 2], to: [cx(E.rect), E.rect.y + E.rect.h + 6] },
+    { from: [G.embedding.x + G.embedding.w, cy(P.rect)], ctrl: [BCX - 120, blockRect.y + blockRect.h + 40], to: [cx(inp.rect), inp.rect.y + inp.rect.h + 8] },
+    { from: [cx(out.rect), out.rect.y - 8], ctrl: [cx(out.rect), (out.rect.y + Uslot.rect.y + Uslot.rect.h) / 2], to: [cx(Uslot.rect), Uslot.rect.y + Uslot.rect.h + 8] },
+    { from: [Uslot.rect.x - 8, cy(Uslot.rect)], ctrl: [(Uslot.rect.x + soft.rect.x + soft.rect.w) / 2, cy(Uslot.rect)], to: [soft.rect.x + soft.rect.w + 8, cy(soft.rect)] },
+    { from: [soft.rect.x - 8, cy(soft.rect)], ctrl: [(soft.rect.x + topList.x + topList.w) / 2, cy(soft.rect)], to: [topList.x + topList.w + 8, cy(soft.rect)] },
   ];
 
   // ---- Thin lines inside the block. ----
   const lines: MapLine[] = [];
   const top = (r: Rect): [number, number] => [cx(r), r.y], bot = (r: Rect): [number, number] => [cx(r), r.y + r.h];
   const right = (r: Rect): [number, number] => [r.x + r.w, cy(r)], left = (r: Rect): [number, number] => [r.x, cy(r)];
-  const between = (above: Rect, below: Rect) => (above.y + above.h + CAP + below.y) / 2;   // y of the gap between two tiers
+  const between = (above: Rect, below: Rect, cap = CAP) => (above.y + above.h + cap + below.y) / 2;   // y of the gap between two tiers
   const busY = between(Wq.rect, inp.rect);
   const railX = BX + 12;
   lines.push({ pts: [top(inp.rect), [BCX, busY]] });
@@ -152,9 +168,9 @@ export function mapLayout(shapes: Record<string, number[]>, words?: string[]): M
   lines.push({ pts: [top(ffHid.rect), bot(ffOut.rect)] });
   lines.push({ pts: [right(ffOut.rect), left(W2.rect)] });
   lines.push({ pts: [top(ffOut.rect), bot(out.rect)] });
-  const res2Y = between(ffHid.rect, ffIn.rect), res2Top = between(out.rect, ffOut.rect);
+  const res2Y = between(ffHid.rect, ffIn.rect), res2Top = between(out.rect, ffOut.rect, 8);
   lines.push({ pts: [[BCX, res2Y], [railX, res2Y], [railX, res2Top], [BCX, res2Top]], dot: true });
 
   const bounds = grow(union(groups.map(g => g.rect)), 50, 60, 50);
-  return { slots, groups, arrows, lines, pred, inputs, bounds, slotById };
+  return { slots, groups, arrows, lines, pred, topList, inputs, bounds, slotById };
 }

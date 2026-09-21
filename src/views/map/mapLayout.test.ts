@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapLayout, predOrder } from './mapLayout';
+import { mapLayout, predOrder, captionBox } from './mapLayout';
 
 const shapes = (T: number, V = 289, d = 20, dFF = 30, Tmax = 24): Record<string, number[]> => ({
   x0: [T, d], h1: [T, d], q: [T, d], k: [T, d], v: [T, d], scores: [T, T], masked: [T, T], attn: [T, T], ctxv: [T, d], attn_out: [T, d],
@@ -16,6 +16,19 @@ describe('mapLayout', () => {
     for (const id of ['in', 'W_q', 'W_k', 'W_v', 'q', 'k', 'v', 'attn', 'ctx', 'W_o', 'ff_in', 'W_1', 'ff_hid', 'W_2', 'ff_out', 'out', 'U', 'softmax', 'E', 'P']) expect(ids).toContain(id);
     expect(ids).not.toContain('loss');
     for (let i = 0; i < L.slots.length; i++) for (let j = i + 1; j < L.slots.length; j++) expect(overlaps(L.slots[i].rect, L.slots[j].rect), `${L.slots[i].id} vs ${L.slots[j].id}`).toBe(false);
+  });
+  it('keeps every caption clear of every other tile and caption', () => {
+    for (const T of [3, 5, 24]) {
+      const L = mapLayout(shapes(T));
+      const boxes = L.slots.map(s => ({ id: s.id + ' caption', r: captionBox(s) }));
+      const tiles = L.slots.map(s => ({ id: s.id, r: s.rect }));
+      for (const c of boxes) for (const t of tiles) if (!t.id.startsWith(c.id.split(' ')[0])) expect(overlaps(c.r, t.r), `${c.id} vs ${t.id} at T=${T}`).toBe(false);
+      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(overlaps(boxes[i].r, boxes[j].r), `${boxes[i].id} vs ${boxes[j].id} at T=${T}`).toBe(false);
+    }
+  });
+  it('never lets the attention tile shrink below a readable size', () => {
+    expect(mapLayout(shapes(3)).slotById.get('attn')!.rect.w).toBe(72);
+    expect(mapLayout(shapes(24)).slotById.get('attn')!.rect.w).toBe(96);
   });
   it('keeps groups apart and inside the bounds', () => {
     const L = mapLayout(shapes(24));

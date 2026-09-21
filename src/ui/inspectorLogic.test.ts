@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dotProductBreakdown, rowCol, fmtNum } from './inspectorLogic';
+import { dotProductBreakdown, rowCol, fmtNum, cellName } from './inspectorLogic';
 import { GPT, T_ } from '../engine/model/gpt';
 import { recordForward } from '../engine/trace/trace';
 import { get } from '../engine/ops/types';
@@ -24,4 +24,17 @@ it('rowCol and fmtNum', () => {
   expect(rowCol([3, 4], 7)).toEqual({ row: 1, col: 3, cols: 4 });
   expect(rowCol([5], 2)).toEqual({ row: 0, col: 2, cols: 5 });
   expect(fmtNum(-1e9)).toBe('-inf'); expect(fmtNum(0)).toBe('0'); expect(fmtNum(0.123456)).toBe('0.1235'); expect(fmtNum(12345)).toBe('1.235e+4');
+});
+
+describe('cellName', () => {
+  const words = ['<unk>', 'the', 'cat'];
+  it('describes an E cell', () => {
+    expect(cellName('E', 2, 3, words)).toBe('Row of word "cat", column 4');
+  });
+  it('describes a probs cell', () => {
+    expect(cellName('probs', 0, 1, words)).toBe('Probability of word "the" at position 1');
+  });
+  it('returns null for an unknown name', () => {
+    expect(cellName('bogus', 0, 0, words)).toBeNull();
+  });
 });

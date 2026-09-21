@@ -53,3 +53,17 @@ export function maxAbs(data: Float64Array): number {
 export function isMasked(v: number): boolean {
   return v <= -1e8;
 }
+
+/** The |value| at the given percentile (0..1), so one outlier does not wash out every other cell.
+ *  Falls back to the max when there are few values. */
+export function robustMax(data: Float64Array, pct = 0.98): number {
+  const n = data.length;
+  if (n < 64) return maxAbs(data);
+  const mags = new Float64Array(n);
+  let k = 0;
+  for (let i = 0; i < n; i++) { const v = data[i]; if (!isMasked(v) && Number.isFinite(v)) mags[k++] = Math.abs(v); }
+  if (k === 0) return 0;
+  const sorted = mags.subarray(0, k).sort();
+  const m = sorted[Math.min(k - 1, Math.floor(pct * (k - 1)))];
+  return m > 0 ? m : sorted[k - 1];
+}

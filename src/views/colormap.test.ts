@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { diverging, sequential, gradientMap, maxAbs, isMasked, MASK_COLOR } from './colormap';
+import { diverging, sequential, gradientMap, maxAbs, robustMax, isMasked, MASK_COLOR } from './colormap';
 
 describe('diverging', () => {
   it('is near-white at 0', () => {
@@ -71,5 +71,15 @@ describe('isMasked', () => {
 describe('MASK_COLOR', () => {
   it('is mid grey', () => {
     expect(MASK_COLOR).toEqual([160, 160, 160]);
+  });
+});
+
+describe('robustMax', () => {
+  it('ignores a single outlier in a large tensor', () => {
+    const d = new Float64Array(1000).fill(0.5); d[7] = 100;
+    expect(robustMax(d)).toBe(0.5);
+  });
+  it('is the plain max for small tensors', () => {
+    expect(robustMax(new Float64Array([1, -3, 2]))).toBe(3);
   });
 });

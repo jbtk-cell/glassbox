@@ -7,6 +7,7 @@ import { Transport } from './Transport';
 import { CellPanel } from './CellPanel';
 import { TrainingPanel } from './TrainingPanel';
 import { ModelDialog } from './ModelDialog';
+import { ContextStrip } from './ContextStrip';
 import { MapView } from '../views/map/MapView';
 import { NetworkView } from '../views/network/NetworkView';
 import { ExplainView } from '../views/explain/ExplainView';
@@ -19,6 +20,7 @@ export function Shell() {
   const view = useStore(s => s.view), setView = useStore(s => s.setView);
   const prompt = useStore(s => s.prompt), setPrompt = useStore(s => s.setPrompt), stepGenerate = useStore(s => s.stepGenerate);
   const model = useStore(s => s.model);
+  const contextSize = useStore(s => s.config.contextSize);
   const [playing, setPlaying] = useState(false);
   const [dialog, setDialog] = useState<'model' | null>(null);
   const [showVocab, setShowVocab] = useState(false), [showText, setShowText] = useState(false);
@@ -39,7 +41,7 @@ export function Shell() {
         <button onClick={stepGenerate} disabled={!model || tokens === 0} title="Predict the next word and add it">Step</button>
         <button onClick={togglePlay} disabled={!model || tokens === 0} title="Keep predicting">{playing ? 'Stop' : 'Play'}</button>
         <button onClick={() => { setPlaying(false); setPrompt(''); }} disabled={tokens === 0}>Clear</button>
-        <span className="readout">Tokens: {tokens}</span>
+        <span className="readout">{tokens} word{tokens === 1 ? '' : 's'}{tokens > contextSize ? `, model reads the last ${contextSize}` : ''}</span>
         <span className="spacer" />
         <button onClick={() => setDialog('model')}>Model...</button>
       </div>
@@ -56,11 +58,12 @@ export function Shell() {
             <span className="tabs">{VIEWS.map(v => <button key={v.id} className={view === v.id ? 'active' : ''} onClick={() => setView(v.id)}>{v.label}</button>)}</span>
           </div>
           <div className="view">
+            {(view === 'flow' || view === 'network') && <ContextStrip />}
             {view === 'flow' && <MapView />}
             {view === 'network' && <NetworkView />}
             {view === 'math' && <ExplainView />}
             {view === 'loss' && <div className="loss-wrap"><LossView /></div>}
-            <CellPanel />
+            {(view === 'flow' || view === 'network') && <CellPanel />}
           </div>
           <Transport />
         </section>

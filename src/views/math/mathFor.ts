@@ -4,7 +4,7 @@ import type { CellRef } from '../../app/store';
 
 export interface MathBlock { title: string; latex: string; note?: string }
 
-const HINT = 'Select a cell in the Flow view to see the numbers.';
+const HINT = 'Select a cell in the Network tab to see the numbers.';
 
 /** Format a number to 4 significant figures; masked/very negative values render as -infinity. */
 function fmt(v: number): string {

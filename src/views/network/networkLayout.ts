@@ -19,7 +19,7 @@ export interface NetLayout { groups: NeuronGroup[]; byKey: Map<string, NeuronGro
 
 export const X_STEP = 140;
 export const DY = 20, R = 7;
-export const STACK_GAP = 36;
+export const STACK_GAP = 60;
 export const COMPACT_THRESHOLD = 48;
 export const COMPACT_HALF_W = 9;
 const COMPACT_MAX_H = 620;
@@ -39,11 +39,11 @@ const SLOTS: string[][] = [
 const BANDS: Band[] = [
   { kind: 'elementwise', from: [T_.tok, T_.pos], to: T_.x0, label: 'add' },
   { kind: 'elementwise', from: [T_.x0], to: T_.h1, label: 'norm' },
-  { kind: 'matrix', from: [T_.h1], to: T_.q, param: 'W_q', label: 'W_q, W_k, W_v' },
-  { kind: 'matrix', from: [T_.h1], to: T_.k, param: 'W_k', label: '' },
-  { kind: 'matrix', from: [T_.h1], to: T_.v, param: 'W_v', label: '' },
+  { kind: 'matrix', from: [T_.h1], to: T_.q, param: 'W_q', label: 'W_q' },
+  { kind: 'matrix', from: [T_.h1], to: T_.k, param: 'W_k', label: 'W_k' },
+  { kind: 'matrix', from: [T_.h1], to: T_.v, param: 'W_v', label: 'W_v' },
   { kind: 'attend', from: [T_.q, T_.k], to: T_.attn, label: 'q . k, softmax' },
-  { kind: 'mix', from: [T_.attn, T_.v], to: T_.ctxv, label: 'mix of v by weight' },
+  { kind: 'mix', from: [T_.attn, T_.v], to: T_.ctxv, label: 'mix v by attention' },
   { kind: 'matrix', from: [T_.ctxv], to: T_.attn_out, param: 'W_o', label: 'W_o' },
   { kind: 'elementwise', from: [T_.attn_out], to: T_.x1, label: 'add x0' },
   { kind: 'elementwise', from: [T_.x1], to: T_.h2, label: 'norm' },
@@ -87,7 +87,7 @@ export function networkLayout(shapes: Record<string, number[]>): NetLayout {
   const skips = SKIPS.filter(s => present(s.from) && present(s.to));
   const top = Math.min(...groups.map(g => g.y0 - g.r - 30));
   const bottom = Math.max(...groups.map(g => g.y0 + g.n * g.dy + 10));
-  const bounds: Rect = { x: -X_STEP / 2, y: top - 190, w: slots.length * X_STEP, h: bottom - top + 220 };
+  const bounds: Rect = { x: -X_STEP / 2, y: top - 150, w: slots.length * X_STEP, h: bottom - top + 170 };
   return { groups, byKey, bands, skips, bounds, top };
 }
 
