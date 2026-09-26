@@ -28,7 +28,7 @@ const COL_GAP = 56;              // gap between q, k, v columns
 const SIDE_GAP = 44;             // gap between a tile and the weight tile beside it
 const ATTN_MIN = 72;             // the attention tile never gets smaller than this
 export const PRED_CELL = { w: 36, h: 27 };
-export const TOP_LIST = { w: 180, rowH: 22, rows: 8 };
+export const TOP_LIST = { w: 250, rowH: 32, rows: 8 };
 
 const union = (rs: Rect[]): Rect => {
   const x0 = Math.min(...rs.map(r => r.x)), y0 = Math.min(...rs.map(r => r.y));

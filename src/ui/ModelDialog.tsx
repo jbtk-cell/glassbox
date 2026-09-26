@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../app/store';
 import { PRESETS } from '../presets';
+import { buildCorpus, TRAIN_RATIO } from '../app/corpusState';
+import { GPT } from '../engine/model/gpt';
 
 export function ModelDialog({ onClose }: { onClose: () => void }) {
   const s = useStore.getState();
@@ -10,7 +12,16 @@ export function ModelDialog({ onClose }: { onClose: () => void }) {
   const [presetId, setPresetId] = useState(s.presetId ?? 'custom');
   const [text, setText] = useState(s.text);
   const corpusError = useStore(x => x.corpusError);
-  const paramCount = useStore(x => x.model?.paramCount());
+  // The count follows the dialog's own settings and text, so it updates before Create is pressed.
+  const paramCount = useMemo(() => {
+    const r = buildCorpus(text, contextSize);
+    if ('error' in r) return null;
+    return new GPT({ ...s.config, contextSize, dModel, dFF, vocabSize: r.corpus.vocab.words.length }).paramCount();
+  }, [text, contextSize, dModel, dFF, s.config]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   const create = () => {
     const st = useStore.getState();
     st.setConfig({ contextSize, dModel, dFF });
@@ -37,8 +48,8 @@ export function ModelDialog({ onClose }: { onClose: () => void }) {
                   <option value="custom">Your own text</option>
                 </select>
               </td></tr>
-              <tr><td>Train test split</td><td>0.6</td></tr>
-              <tr><td>Parameters</td><td>{paramCount?.toLocaleString() ?? '-'}</td></tr>
+              <tr title="The first part of the text is for learning; the rest is held back to test whether what it learned carries over"><td>Train test split</td><td>{TRAIN_RATIO}</td></tr>
+              <tr title="Every learned number in the model; the total grows with the vocabulary"><td>Parameters</td><td>{paramCount?.toLocaleString() ?? '-'}</td></tr>
             </tbody>
           </table>
           <textarea value={text} rows={9} spellCheck={false} onChange={e => { setText(e.target.value); setPresetId('custom'); }} />

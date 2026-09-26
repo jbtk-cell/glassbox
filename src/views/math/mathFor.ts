@@ -32,8 +32,10 @@ function generalFormula(kind: OpKind): string {
     case 'linear': return 'y_{t,o} = b_o + \\sum_i x_{t,i}\\,W_{i,o}';
     case 'scores': return 'S_{i,j} = \\frac{1}{\\sqrt{d}}\\sum_c q_{i,c}\\,k_{j,c}';
     case 'mask': return 'S\'_{i,j} = \\begin{cases} -\\infty & j > i \\\\ S_{i,j} & j \\le i \\end{cases}';
-    case 'softmax_rows': case 'softmax_out':
+    case 'softmax_rows':
       return 'A_{i,j} = \\frac{\\exp(S_{i,j}-\\max_c S_{i,c})}{\\sum_c \\exp(S_{i,c}-\\max_c S_{i,c})}';
+    case 'softmax_out':
+      return 'p_{t,w} = \\frac{\\exp(z_{t,w}-\\max_c z_{t,c})}{\\sum_c \\exp(z_{t,c}-\\max_c z_{t,c})}';
     case 'attn_apply': return 'y_{i,c} = \\sum_j A_{i,j}\\,v_{j,c}';
     case 'relu': return 'y_i = \\max(0, x_i)';
     case 'loss': return 'L = -\\frac{1}{T}\\sum_t \\log p_{t,\\text{target}_t}';

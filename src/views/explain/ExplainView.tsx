@@ -5,7 +5,7 @@ import 'katex/dist/katex.min.css';
 import katex from 'katex';
 import { useStore } from '../../app/store';
 import { mathFor } from '../math/mathFor';
-import { STEPS, GROUPS, OVERVIEW, BACKWARD_NOTE } from './steps';
+import { STEPS, GROUPS, OVERVIEW, BACKWARD_NOTE, GLOSSARY } from './steps';
 import type { TraceStep } from '../../engine/trace/trace';
 
 export function ExplainView() {
@@ -52,6 +52,8 @@ export function ExplainView() {
       <h2>What this model does</h2>
       {OVERVIEW.map((p, i) => <p key={i}>{p.replace('15,379', paramCount.toLocaleString())}</p>)}
       <p className="hint">Press Next to walk through the {forward.length} steps that produced the current prediction{backward.length ? `, then the ${backward.length} steps of the training update` : ''}.</p>
+      <h3>Short names on the Neurons tab</h3>
+      <table className="glossary"><tbody>{GLOSSARY.map(([k, v]) => <tr key={k}><td>{k}</td><td>{v}</td></tr>)}</tbody></table>
     </>;
   } else {
     const info = STEPS[step.opId];
@@ -79,6 +81,7 @@ export function ExplainView() {
       <div className="explain-pane">
         {pane}
         <div className="explain-nav">
+          {cursorIndex >= trace.steps.length - 1 && <button onClick={() => seek(-1)} title="Back to the overview, then Next walks through every step">Start from the beginning</button>}
           <button onClick={prev} disabled={cursorIndex < 0}>Previous</button>
           <button onClick={next} disabled={cursorIndex >= trace.steps.length - 1}>Next</button>
         </div>
