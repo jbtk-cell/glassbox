@@ -45,3 +45,11 @@ are fixed; the map shrank to a dot and its group tags piled up, which was the re
 All of the above was addressed in the commit that added this folder, except the "worked
 numeric example by default" and "watchable learning arc" requests, which are design work
 for another round.
+
+## Round 2: re-check of the fixed build
+
+A fresh novice-persona tester (Sonnet) drove the fixed build against the eight main
+complaints: all eight came back FIXED (`round2-recheck.md`). It raised two small new
+points: the dashed border on unknown words had no legend (a legend line now appears under
+the word strip when it applies), and with Vocabulary open during training the bottom rows
+of the Training panel sit below the fold at 900 px; the column scrolls, but nothing says so.

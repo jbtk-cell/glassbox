@@ -133,3 +133,5 @@ table { border-collapse: collapse; }
 .explain-view table.glossary td { padding: 3px 10px 3px 0; font-size: 12.5px; line-height: 1.4; vertical-align: top; border-bottom: 1px solid #eee; }
 .explain-view table.glossary td:first-child { font-family: ui-monospace, Menlo, monospace; white-space: nowrap; color: #333; }
 .explain-view h3 { font-size: 13px; margin: 18px 0 4px; letter-spacing: 0.02em; text-transform: uppercase; color: #555; }
+.tok-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 11px; color: #666; }
+.tok-legend .tok { font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; margin: 0 4px 0 0; }

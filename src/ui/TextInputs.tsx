@@ -29,6 +29,13 @@ export function TextInputs() {
             ))}
           </div>
         )}
+        {words.length > 0 && (words.some(w => !known(w)) || genFrom < words.length || first > 0) && (
+          <div className="tok-legend">
+            {words.some(w => !known(w)) && <span><span className="tok unk">dashed</span> not in Training Text, so the model sees it as unknown</span>}
+            {genFrom < words.length && <span><span className="tok gen">blue</span> added by Step</span>}
+            {first > 0 && <span><span className="tok out">faded</span> outside the {contextSize}-word window</span>}
+          </div>
+        )}
       </div>
     </section>
   );
