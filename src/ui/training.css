@@ -9,3 +9,5 @@
 .sparkline { width: 100%; height: 56px; display: block; margin-top: 6px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; }
 .legend { display: flex; gap: 12px; font-size: 11px; color: #555; margin-top: 3px; }
 .legend i { display: inline-block; width: 9px; height: 9px; margin-right: 4px; vertical-align: -1px; }
+.training .note { font-size: 11.5px; line-height: 1.4; color: #92400e; background: #fffbeb; border: 1px solid #fcd34d; padding: 6px 8px; border-radius: 4px; margin: 8px 0 0; }
+.training .note.quiet { color: #444; background: #f6f6f6; border-color: #ddd; }

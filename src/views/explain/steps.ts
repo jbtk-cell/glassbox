@@ -19,7 +19,7 @@ export const STEPS: Record<string, StepText> = {
   },
   add_pos: {
     title: 'Add the two rows', group: 'Inputs',
-    text: 'The word row and the position row are added together, number by number, giving one list of 20 numbers per word. Nothing is lost by adding: 20 slots is plenty of room for both. This list is a notepad that every later step writes onto.',
+    text: 'The word row and the position row are added together, number by number, giving one list of 20 numbers per word. Adding does blur the two together, but training teaches the model to keep word and position in different directions of the 20 slots, so later steps can still tell them apart. This list is a notepad that every later step writes onto.',
     where: 'Network tab: the Input tile at the bottom of the Transformer block. Neurons tab: the x0 column.',
   },
   ln1: {
@@ -44,7 +44,7 @@ export const STEPS: Record<string, StepText> = {
   },
   scores: {
     title: 'Score every pair', group: 'Attention',
-    text: 'For every pair of words, the question of one is compared with the label of the other: multiply matching numbers, add them up, divide by the square root of 20. A large score means "you matter to me right now". With 5 words that is a 5 by 5 grid of scores.',
+    text: 'For every pair of words, the question of one is compared with the label of the other: multiply matching numbers, add them up, divide by the square root of 20. A large score means "you matter to me right now". With five words that would be a 5 by 5 grid; the tile in the Network tab has one row and one column per word in the window of scores.',
     where: 'Network tab: the Attention tile. Neurons tab: the wires from q and k into the attention column.',
   },
   causal_mask: {
@@ -79,7 +79,7 @@ export const STEPS: Record<string, StepText> = {
   },
   ff_up: {
     title: 'Hidden layer', group: 'Feed-forward',
-    text: 'From here on each word is processed alone; there is no more mixing. Its 20 numbers go through the W_1 grid into 30 hidden numbers. This is where the model stores facts that do not depend on the surrounding words, such as which words tend to follow which.',
+    text: 'From here on each word is processed alone, using the numbers it just gathered from earlier words; there is no more mixing. Its 20 numbers go through the W_1 grid into 30 hidden numbers. This is where the model stores facts that do not depend on the surrounding words, such as which words tend to follow which.',
     where: 'Network tab: the Input -> Hidden weight tile and the FF Hidden tile. Neurons tab: the h2 to ff_pre wires.',
   },
   relu: {
@@ -109,7 +109,7 @@ export const STEPS: Record<string, StepText> = {
   },
   softmax_out: {
     title: 'Turn scores into probabilities', group: 'Prediction',
-    text: 'The same trick as the attention weights: e to the power of each score, divided by the total. Now every word in the vocabulary has a probability and they add up to 1. The largest one is the model\'s guess for the next word. Step and Play pick a word from these probabilities.',
+    text: 'The same trick as the attention weights: e to the power of each score, divided by the total. Now every word in the vocabulary has a probability and they add up to 1. The largest is the most likely next word, but Step and Play do not always take it: they draw a word at random, weighted by these probabilities, so a word with 30% comes up about three times in ten. Temperature 0 always takes the most likely word; a high temperature flattens the odds.',
     where: 'Network tab: the Softmax sequence tile and the Predicted next token circles. Neurons tab: the probs strip.',
   },
   loss: {
@@ -131,4 +131,23 @@ export const OVERVIEW = [
   'It only knows the words that appear in Training Text. Each of those words has a row of 20 numbers in the word table, and each of the 24 slots in Text Inputs has a row of 20 numbers in the position table. Adding a word\'s row to its slot\'s row gives one list of 20 numbers per word.',
   'Those lists go through the Transformer block. First the mixing step, called attention, where each word borrows from the words before it. Then the thinking step, a small network that each word goes through alone. Both write their results back onto the same list.',
   'The last word\'s list is then scored against every word in the vocabulary, and the scores become probabilities. Training compares the probabilities with the word that really came next and nudges all 15,379 numbers to make that word more likely next time.',
+];
+
+/** What the short names on the Neurons tab and the tile captions stand for. */
+export const GLOSSARY: [string, string][] = [
+  ['tok', 'the word\'s row from the word table (E)'],
+  ['pos', 'the slot\'s row from the position table (P)'],
+  ['x0', 'word row + position row: the list of 20 numbers each word starts with'],
+  ['h1, h2, hf', 'the same list after tidying (layer norm): rescaled so no number dominates'],
+  ['q, k, v', 'question, label and content: three views of each word made with the dials W_q, W_k, W_v'],
+  ['attn', 'attention: how much the current word borrows from each earlier word (adds up to 1)'],
+  ['ctxv', 'the mix: the content of earlier words, blended by attention'],
+  ['attn_out', 'the mix written back into 20 numbers through W_o'],
+  ['x1', 'x0 plus attn_out: the notepad after the mixing step'],
+  ['ff_pre, ff_act', 'the hidden layer of the thinking step, before and after ReLU (negatives set to 0)'],
+  ['ff_out', 'the hidden layer brought back to 20 numbers through W_2'],
+  ['x2', 'x1 plus ff_out: the notepad after the thinking step'],
+  ['logits', 'one score per word in the vocabulary, from hf through U'],
+  ['probs', 'the scores turned into probabilities (softmax)'],
+  ['W_1, W_2, W_o, U', 'learned tables of dials; orange borders mark every learned table'],
 ];

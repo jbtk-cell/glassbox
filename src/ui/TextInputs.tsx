@@ -6,9 +6,12 @@ export function TextInputs() {
   const prompt = useStore(s => s.prompt), setPrompt = useStore(s => s.setPrompt);
   const corpus = useStore(s => s.corpus);
   const contextSize = useStore(s => s.config.contextSize);
+  const generatedFrom = useStore(s => s.generatedFrom);
   const words = splitWords(prompt);
   const known = (w: string) => !corpus || corpus.vocab.index.has(w);
   const first = Math.max(0, words.length - contextSize);
+  // Words Step appended are shown in blue so they never pass for something the user typed.
+  const genFrom = generatedFrom === null ? Infinity : splitWords(prompt.slice(0, generatedFrom)).length;
 
   return (
     <section className="frame">
@@ -20,10 +23,17 @@ export function TextInputs() {
             {words.map((w, i) => w === '\n' ? <br key={i} /> : (
               <span
                 key={i}
-                className={'tok' + (i < first ? ' out' : '') + (known(w) ? '' : ' unk')}
-                title={i < first ? `Outside the window: the model only reads the last ${contextSize} words` : (known(w) ? '' : 'Not in Training Text, so the model sees it as an unknown word')}
+                className={'tok' + (i < first ? ' out' : '') + (known(w) ? '' : ' unk') + (i >= genFrom ? ' gen' : '')}
+                title={(i >= genFrom ? 'Added by Step: the word the model picked. ' : '') + (i < first ? `Outside the window: the model only reads the last ${contextSize} words` : (known(w) ? '' : 'Not in Training Text, so the model sees it as an unknown word'))}
               >{displayWord(w)}</span>
             ))}
+          </div>
+        )}
+        {words.length > 0 && (words.some(w => !known(w)) || genFrom < words.length || first > 0) && (
+          <div className="tok-legend">
+            {words.some(w => !known(w)) && <span><span className="tok unk">dashed</span> not in Training Text</span>}
+            {genFrom < words.length && <span><span className="tok gen">blue</span> added by Step</span>}
+            {first > 0 && <span><span className="tok out">faded</span> outside the {contextSize}-word window</span>}
           </div>
         )}
       </div>

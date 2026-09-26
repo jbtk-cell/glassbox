@@ -15,7 +15,7 @@ import { displayWord } from '../../ui/words';
 
 const ACCENT = '#d97706', ORANGE = '#e08a1e', INK = '#222', DIM = '#8a8a8a';
 const TAG_BG = '#f3e79a', TAG_BORDER = '#c8b04a', ARROW = 'rgba(240, 200, 90, 0.75)', ARROW_EDGE = 'rgba(200, 160, 50, 0.9)';
-const CAPTION_ZOOM = 0.28, SHAPE_ZOOM = 0.9, NUMBER_PX = 22, WORD_ZOOM = 0.85;
+const CAPTION_ZOOM = 0.2, SHAPE_ZOOM = 0.9, NUMBER_PX = 22, WORD_ZOOM = 0.85;
 
 function fmt(v: number): string { return isMasked(v) ? '-inf' : Math.abs(v) >= 1000 || (Math.abs(v) < 0.001 && v !== 0) ? v.toExponential(2) : v.toPrecision(3); }
 
@@ -77,7 +77,7 @@ export function MapView() {
 
   if (trace !== lastTrace.current) { lastTrace.current = trace; versionRef.current++; }
 
-  const size = useCallback(() => { const el = wrapRef.current; return { w: el?.clientWidth ?? 800, h: el?.clientHeight ?? 600 }; }, []);
+  const size = useCallback(() => { const el = wrapRef.current; return { w: el?.clientWidth || 800, h: el?.clientHeight || 600 }; }, []);
   const fitArea = useCallback(() => { const { w, h } = size(); return { w, h: Math.max(200, h - 80) }; }, [size]);   // keep the legend row clear
   const fitAll = useCallback(() => { if (layout) setCam(fit(layout.bounds, fitArea(), 24)); }, [layout, fitArea]);
 
@@ -222,7 +222,7 @@ export function MapView() {
 
       const L = R(layout.topList); const rowH = TOP_LIST.rowH * Z;
       g.fillStyle = 'white'; g.fillRect(L.x, L.y, L.w, L.h); g.strokeStyle = '#bbb'; g.lineWidth = 1; g.strokeRect(L.x, L.y, L.w, L.h);
-      const fontPx = Math.max(9, Math.min(13, 12 * Z));
+      const fontPx = Math.max(10, Math.min(14, 26 * Z));
       g.fillStyle = INK; g.font = `600 ${fontPx}px system-ui`; g.textAlign = 'left'; g.textBaseline = 'middle';
       g.fillText('Most likely next words', L.x + 8, L.y + 14 * Z + 4, L.w - 16);
       if (!ready) { g.fillStyle = DIM; g.font = `${fontPx}px system-ui`; g.fillText('not computed yet', L.x + 8, L.y + 30 * Z + 4 + rowH / 2, L.w - 16); }
@@ -231,7 +231,7 @@ export function MapView() {
         const pmax = P.data[row + ranked[0]] || 1; const target = trace.ctx.targets?.[T - 1];
         ranked.forEach((id, n) => {
           const y = L.y + 30 * Z + n * rowH, p = P.data[row + id];
-          const barX = L.x + L.w * 0.42, barW = L.w * 0.36;
+          const barX = L.x + L.w * 0.42, barW = L.w * 0.22;
           g.fillStyle = 'rgba(214,40,40,0.18)'; g.fillRect(barX, y + rowH * 0.2, barW * (p / pmax), rowH * 0.6);
           if (rowH >= 10) {
             g.fillStyle = id === target ? '#15803d' : INK; g.font = `${n === 0 ? '600 ' : ''}${fontPx}px ui-monospace, monospace`; g.textAlign = 'left';
@@ -281,6 +281,7 @@ export function MapView() {
     g.font = `600 ${tagPx}px system-ui`; g.textBaseline = 'middle';
     for (const grp of layout.groups) {
       const [x, y] = S(grp.rect.x, grp.rect.y); const tw = g.measureText(grp.label).width + 14;
+      if (grp.rect.w * Z < tw - 4) continue;   // zoomed far out: a tag wider than its group would sit on its neighbours
       g.beginPath(); g.roundRect(x, y - tagH - 2, tw, tagH, 3); g.fillStyle = TAG_BG; g.fill(); g.strokeStyle = TAG_BORDER; g.lineWidth = 1; g.stroke();
       g.fillStyle = INK; g.textAlign = 'left'; g.fillText(grp.label, x + 7, y - 2 - tagH / 2);
     }
@@ -288,6 +289,7 @@ export function MapView() {
     // Fixed overlays: phase notice, iteration counter, legend.
     if (phase === 'backward') drawBanner(g, 8, h - 58, 'Backward pass: tiles show gradients, how the loss reacts to each number');
     else if (phase === 'update') drawBanner(g, 8, h - 58, 'Update: tiles show how far each learned number just moved');
+    else if (training === 'running') drawBanner(g, 8, h - 58, 'Training: the orange tiles are changing. Press Step for a prediction with the current numbers.', '#b45309');
     g.fillStyle = training === 'running' ? ACCENT : '#555'; g.font = '13px system-ui'; g.textAlign = 'left'; g.textBaseline = 'bottom';
     g.fillText(`${iterations} iteration${iterations === 1 ? '' : 's'}${training === 'running' ? '  (training)' : ''}`, 10, h - 8);
     drawLegend(g, w - 8, h - 8, phase);

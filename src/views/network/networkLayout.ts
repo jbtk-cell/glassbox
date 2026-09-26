@@ -25,9 +25,9 @@ export const COMPACT_HALF_W = 9;
 const COMPACT_MAX_H = 620;
 
 const CAPTIONS: Record<string, string> = {
-  [T_.tok]: 'word row', [T_.pos]: 'position row', [T_.x0]: 'sum', [T_.h1]: 'tidied', [T_.q]: 'question', [T_.k]: 'label', [T_.v]: 'content',
+  [T_.tok]: 'word row', [T_.pos]: 'position row', [T_.x0]: 'word + position', [T_.h1]: 'tidied', [T_.q]: 'question', [T_.k]: 'label', [T_.v]: 'content',
   [T_.attn]: 'attention', [T_.ctxv]: 'mix', [T_.attn_out]: 'written back', [T_.x1]: 'after attention', [T_.h2]: 'tidied', [T_.ff_pre]: 'hidden',
-  [T_.ff_act]: 'after ReLU', [T_.ff_out]: 'FF output', [T_.x2]: 'block output', [T_.hf]: 'tidied', [T_.logits]: 'scores', [T_.probs]: 'probabilities',
+  [T_.ff_act]: 'after ReLU', [T_.ff_out]: 'back to 20', [T_.x2]: 'block output', [T_.hf]: 'tidied', [T_.logits]: 'scores', [T_.probs]: 'probabilities',
 };
 
 /** Column slots, left to right; a slot with several keys stacks them vertically. */
@@ -87,7 +87,7 @@ export function networkLayout(shapes: Record<string, number[]>): NetLayout {
   const skips = SKIPS.filter(s => present(s.from) && present(s.to));
   const top = Math.min(...groups.map(g => g.y0 - g.r - 30));
   const bottom = Math.max(...groups.map(g => g.y0 + g.n * g.dy + 10));
-  const bounds: Rect = { x: -X_STEP / 2, y: top - 150, w: slots.length * X_STEP, h: bottom - top + 170 };
+  const bounds: Rect = { x: -X_STEP / 2, y: top - 190, w: slots.length * X_STEP, h: bottom - top + 210 };
   return { groups, byKey, bands, skips, bounds, top };
 }
 

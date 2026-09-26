@@ -150,12 +150,14 @@ export function NetworkView() {
 
     // Skip arcs: values carried forward and added back in.
     g.setLineDash([5, 4]); g.strokeStyle = 'rgba(80,80,80,0.55)'; g.lineWidth = 1;
+    // Boxes of every label drawn so far; later captions move to stay clear of them.
+    const placed: { x: number; y: number; w: number; h: number }[] = [];
     for (const sk of layout.skips) {
       const a = layout.byKey.get(sk.from)!, b = layout.byKey.get(sk.to)!;
       const [x0, y0] = S(a.x, layout.top - 36), [x1, y1] = S(b.x, layout.top - 36); const [mx, my] = S((a.x + b.x) / 2, layout.top - 150);
       g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(mx, my, x1, y1); g.stroke();
       g.font = '10px system-ui'; const tw = g.measureText(sk.label).width + 8; const ly = (y0 + my) / 2 - 2;
-      backing((x0 + x1) / 2 - tw / 2, ly - 12, tw, 13); g.fillStyle = '#555'; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(sk.label, (x0 + x1) / 2, ly);
+      backing((x0 + x1) / 2 - tw / 2, ly - 12, tw, 13); placed.push({ x: (x0 + x1) / 2 - tw / 2, y: ly - 12, w: tw, h: 13 }); g.fillStyle = '#555'; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(sk.label, (x0 + x1) / 2, ly);
     }
     g.setLineDash([]);
 
@@ -186,10 +188,12 @@ export function NetworkView() {
         const hw = COMPACT_HALF_W * Z;
         for (let i = 0; i < gr.n; i++) { const v = t.data[base + i]; g.fillStyle = rgba(neuronColor(gr.key, v, m), alpha); g.fillRect(gx - hw, gy0 + i * gr.dy * Z, hw * 2, Math.max(1, gr.dy * Z)); }
         g.strokeStyle = `rgba(0,0,0,${0.5 * alpha})`; g.lineWidth = 1; g.strokeRect(gx - hw, gy0, hw * 2, heightPx);
-        if (words) {
+        const nextX = Math.min(...layout.groups.filter(o => o.x > gr.x).map(o => o.x), Infinity);
+        const room = Math.min(400, (nextX - gr.x) * Z - hw * 2 - 10);   // screen px before the next column starts
+        if (words && room >= 44) {
           const order = [...Array(gr.n).keys()].sort((a, b) => t.data[base + b] - t.data[base + a]); const used: number[] = [];
           g.font = '10px system-ui'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillStyle = `rgba(30,30,30,${alpha})`;
-          for (const i of order) { if (used.length >= 8) break; const y = gy0 + (i + 0.5) * gr.dy * Z; if (used.some(u => Math.abs(u - y) < 11)) continue; used.push(y); g.fillText(displayWord(words[i]), gx + hw + 5, y); g.beginPath(); g.moveTo(gx + hw, y); g.lineTo(gx + hw + 3, y); g.strokeStyle = 'rgba(0,0,0,0.5)'; g.stroke(); }
+          for (const i of order) { if (used.length >= 8) break; const y = gy0 + (i + 0.5) * gr.dy * Z; if (used.some(u => Math.abs(u - y) < 11)) continue; used.push(y); g.fillText(displayWord(words[i]), gx + hw + 5, y, room); g.beginPath(); g.moveTo(gx + hw, y); g.lineTo(gx + hw + 3, y); g.strokeStyle = 'rgba(0,0,0,0.5)'; g.stroke(); }
         }
         for (const [ref, colour] of [[selection, '#2563eb'], [hover, '#60a5fa']] as const) {
           if (ref && ref.key === tKey(gr.key) && ref.index >= base && ref.index < base + gr.n) { const i = ref.index - base; g.strokeStyle = colour; g.lineWidth = 2; g.strokeRect(gx - hw - 2, gy0 + i * gr.dy * Z - 1, hw * 2 + 4, Math.max(2, gr.dy * Z) + 2); }
@@ -207,15 +211,10 @@ export function NetworkView() {
           if (gr.words && Z * gr.dy >= 9) { g.fillStyle = masked ? DIM : INK; g.font = `${Math.max(8, Math.min(11, Z * gr.dy * 0.75))}px system-ui`; g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(ctxWords[i] ?? displayWord(words?.[trace.ctx.tokens[i]]), x - r - 5, y, 70); }
         }
       }
-      // Caption above the group, with a backing.
-      const [cx, cy] = S(gr.x, gr.y0 - (gr.compact ? 0 : gr.r) - 8);
-      g.font = '600 11px system-ui'; const lw = g.measureText(gr.label).width; g.font = '9px system-ui'; const sw = g.measureText(gr.sub).width;
-      const bw = Math.max(lw, sw) + 8; backing(cx - bw / 2, cy - 26, bw, 26);
-      g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillStyle = `rgba(30,30,30,${alpha})`; g.font = '600 11px system-ui'; g.fillText(gr.label, cx, cy - 12);
-      g.fillStyle = `rgba(110,110,110,${alpha})`; g.font = '9px system-ui'; g.fillText(gr.sub, cx, cy - 1);
     }
 
-    // Band labels, one per band, in the gap between its columns at the target's height.
+    // Band labels, one per band, in the gap between its columns at the target's height. Their
+    // boxes are kept so the captions drawn next can stay clear of them.
     g.font = '10px system-ui'; g.textBaseline = 'middle';
     for (const band of layout.bands) {
       if (!band.label) continue;
@@ -232,6 +231,25 @@ export function NetworkView() {
       g.fillStyle = fill; g.strokeStyle = stroke; g.lineWidth = 1;
       g.beginPath(); g.roundRect(x - tw / 2, y - 8, tw, 16, 3); g.fill(); g.stroke();
       g.fillStyle = INK; g.textAlign = 'center'; g.fillText(band.label, x, y);
+      placed.push({ x: x - tw / 2, y: y - 8, w: tw, h: 16 });
+    }
+
+    // Captions above each column: the plain name, with the symbol used in Explain under it. A
+    // caption that would touch a pill or an earlier caption moves up a row, so at any zoom no two
+    // pieces of text overlap; at low zoom the columns alternate between two rows.
+    const MAIN_FONT = '600 12px system-ui', SYM_FONT = '10px ui-monospace, Menlo, monospace';
+    const hits = (r: { x: number; y: number; w: number; h: number }) => placed.some(q => r.x < q.x + q.w && r.x + r.w > q.x && r.y < q.y + q.h && r.y + r.h > q.y);
+    for (const gr of layout.groups) {
+      const alpha = alphaOf(gr.key);
+      const main = gr.sub || gr.label, sym = gr.sub ? gr.label : '';
+      g.font = MAIN_FONT; const lw = g.measureText(main).width; g.font = SYM_FONT; const sw = g.measureText(sym).width;
+      const bw = Math.max(lw, sw) + 8;
+      const [cx, cy] = S(gr.x, gr.y0 - (gr.compact ? 0 : gr.r) - 8);
+      let ty = cy; let rect = { x: cx - bw / 2, y: ty - 28, w: bw, h: 28 };
+      for (let k = 0; k < 3 && hits(rect); k++) { ty -= 30; rect = { ...rect, y: ty - 28 }; }
+      placed.push(rect); backing(rect.x, rect.y, rect.w, rect.h);
+      g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillStyle = `rgba(30,30,30,${alpha})`; g.font = MAIN_FONT; g.fillText(main, cx, ty - 13);
+      g.fillStyle = `rgba(110,110,110,${alpha})`; g.font = SYM_FONT; g.fillText(sym, cx, ty - 1);
     }
 
     // Fixed overlays.
@@ -245,9 +263,10 @@ export function NetworkView() {
     if (!layout) return null;
     for (const gr of layout.groups) {
       if (gr.compact) { if (Math.abs(wx - gr.x) > COMPACT_HALF_W + 2) continue; const i = Math.floor((wy - gr.y0) / gr.dy); if (i >= 0 && i < gr.n) return { gr, i }; continue; }
-      if (Math.abs(wx - gr.x) > gr.r + 3) continue;
+      // Snap to a circle from a little way off, so hovering near a column shows its wires.
+      if (Math.abs(wx - gr.x) > gr.r + 9) continue;
       const i = Math.round((wy - gr.y0) / gr.dy); if (i < 0 || i >= gr.n) continue;
-      if (Math.hypot(wx - gr.x, wy - rowY(gr, i)) <= gr.r + 3) return { gr, i };
+      if (Math.hypot(wx - gr.x, wy - rowY(gr, i)) <= gr.r + 9) return { gr, i };
     }
     return null;
   }, [layout]);
@@ -273,7 +292,7 @@ export function NetworkView() {
     const n = hitNeuron(wx, wy);
     if (n) {
       const v = trace.ctx.tensors.get(n.gr.key)!.data[position * n.gr.n + n.i];
-      const what = n.gr.key === T_.attn ? `attention on "${ctxWords[n.i] ?? '?'}" = ${fmt(v)}` : n.gr.compact && words ? `${n.gr.key} for "${displayWord(words[n.i])}" = ${fmt(v)}` : `${n.gr.key}[${n.i}] = ${fmt(v)}`;
+      const what = n.gr.key === T_.attn ? `attention on "${ctxWords[n.i] ?? '?'}" = ${fmt(v)}` : n.gr.compact && words ? `${n.gr.key} for "${displayWord(words[n.i])}" = ${fmt(v)}` : `${n.gr.sub ? n.gr.sub + ' ' : ''}${n.gr.key}[${n.i}] = ${fmt(v)}`;
       setHover({ key: tKey(n.gr.key), index: position * n.gr.n + n.i }); setTip({ x: sx + 14, y: sy + 14, text: what }); return;
     }
     const wr = hitWire(wx, wy);
@@ -293,7 +312,7 @@ export function NetworkView() {
   const zoomBy = (f: number) => { const { w, h } = size(); setCam(c => zoomAt(c, w / 2, h / 2, f)); };
 
   return (
-    <div ref={wrapRef} className="map-view" data-cam={`${cam.x.toFixed(1)},${cam.y.toFixed(1)},${cam.zoom.toFixed(4)}`} style={{ cursor: drag.current ? 'grabbing' : 'default' }}
+    <div ref={wrapRef} className="map-view" data-cam={`${cam.x.toFixed(1)},${cam.y.toFixed(1)},${cam.zoom.toFixed(4)}`} style={{ cursor: drag.current ? 'grabbing' : hover ? 'pointer' : 'default' }}
       onMouseMove={onMove} onMouseDown={onDown} onMouseUp={onUp} onMouseLeave={() => { drag.current = null; setHover(null); setTip(null); }} onWheel={onWheel} onDoubleClick={fitAll}>
       <canvas ref={canvasRef} />
       <div className="map-zoom">

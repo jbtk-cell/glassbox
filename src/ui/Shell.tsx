@@ -38,10 +38,10 @@ export function Shell() {
     <div className="workspace">
       <div className="toolbar">
         <span className="app">glassbox</span>
-        <button onClick={stepGenerate} disabled={!model || tokens === 0} title="Predict the next word and add it">Step</button>
+        <button onClick={stepGenerate} disabled={!model || tokens === 0} title={tokens === 0 ? 'Type a few words in Text Inputs first' : 'Predict the next word and add it'}>Step</button>
         <button onClick={togglePlay} disabled={!model || tokens === 0} title="Keep predicting">{playing ? 'Stop' : 'Play'}</button>
         <button onClick={() => { setPlaying(false); setPrompt(''); }} disabled={tokens === 0}>Clear</button>
-        <span className="readout">{tokens} word{tokens === 1 ? '' : 's'}{tokens > contextSize ? `, model reads the last ${contextSize}` : ''}</span>
+        <span className="readout" title="Words, punctuation marks and line breaks each count as one token">{tokens} token{tokens === 1 ? '' : 's'}{tokens > contextSize ? `, model reads the last ${contextSize}` : ''}</span>
         <span className="spacer" />
         <button onClick={() => setDialog('model')}>Model...</button>
       </div>
@@ -49,9 +49,9 @@ export function Shell() {
         <div className="column">
           <TextInputs />
           <LMControls showVocab={showVocab} setShowVocab={setShowVocab} showText={showText} setShowText={setShowText} />
-          <TrainingPanel />
           {showVocab && <VocabularyPanel />}
           {showText && <TrainingTextPanel />}
+          <TrainingPanel />
         </div>
         <section className="frame network">
           <div className="titlebar">

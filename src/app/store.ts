@@ -24,6 +24,10 @@ export interface Data {
   training: 'idle' | 'running'; history: Metrics[]; trainError: string | null; trainerFallback: boolean;
   trace: Trace | null; cursorIndex: number; nonce: number;
   prompt: string; promptUnknown: string[]; generated: number[] | null;
+  traceWords: string[] | null;       // the user's spelling of the words behind trace.ctx.tokens, when the trace came from the prompt
+  picked: number | null;             // the token the last Step appended to the prompt
+  generatedFrom: number | null;      // prompt length before Step started appending words; null once the user edits
+  notice: string | null;             // a one-line message for the context strip, e.g. why Step did nothing
   view: View; selection: CellRef | null; hover: CellRef | null; position: number;
 }
 
@@ -48,7 +52,7 @@ export const initialData: Data = {
   config: { ...DEFAULTS, vocabSize: 0 }, lr: ADAM_DEFAULTS.lr, sample: { ...SAMPLE_DEFAULTS },
   model: null, adam: null, training: 'idle', history: [], trainError: null, trainerFallback: false,
   trace: null, cursorIndex: -1, nonce: 0,
-  prompt: '', promptUnknown: [], generated: null,
+  prompt: '', promptUnknown: [], generated: null, traceWords: null, picked: null, generatedFrom: null, notice: null,
   view: 'flow', selection: null, hover: null, position: 0,
 };
 
@@ -57,11 +61,12 @@ const get_ = (tr: Trace, name: string) => get(tr.ctx, name);
 let trainer: Trainer | null = null;
 let trainerStale = true;   // main-thread params changed since the worker last saw them
 
-function promptTokens(prompt: string, corpus: Corpus): { tokens: number[]; unknown: string[] } {
+function promptTokens(prompt: string, corpus: Corpus): { words: string[]; tokens: number[]; unknown: string[] } {
   const words = splitWords(prompt);
   const unknown = [...new Set(words.filter(w => !corpus.vocab.index.has(w)))];
-  return { tokens: encode(words, corpus.vocab), unknown };
+  return { words, tokens: encode(words, corpus.vocab), unknown };
 }
+const EMPTY_NOTICE = 'Type a few words in Text Inputs first.';
 
 /** Re-run the current trace's computation with the model's current parameters. Training traces do not move the parameters. */
 function rerecord(model: GPT, trace: Trace, lr: number): Trace {
@@ -90,9 +95,10 @@ export const useStore = create<State>()((set, get) => {
       const { text, config, lr } = get();
       dropTrainer();
       const r = buildCorpus(text, config.contextSize);
-      if ('error' in r) { set({ corpus: null, corpusError: r.error, model: null, adam: null, trace: null, cursorIndex: -1, history: [], generated: null, selection: null, hover: null }); return; }
+      if ('error' in r) { set({ corpus: null, corpusError: r.error, model: null, adam: null, trace: null, cursorIndex: -1, history: [], generated: null, traceWords: null, picked: null, selection: null, hover: null }); return; }
       const cfg = { ...config, vocabSize: r.corpus.vocab.words.length };
-      set({ corpus: r.corpus, corpusError: null, config: cfg, ...freshModel(cfg, lr), trace: null, cursorIndex: -1, history: [], trainError: null, generated: null, promptUnknown: [], selection: null, hover: null, position: 0 });
+      // A new vocabulary makes the old prompt meaningless, so Text Inputs starts empty.
+      set({ corpus: r.corpus, corpusError: null, config: cfg, ...freshModel(cfg, lr), trace: null, cursorIndex: -1, history: [], trainError: null, generated: null, prompt: '', promptUnknown: [], traceWords: null, picked: null, generatedFrom: null, notice: null, selection: null, hover: null, position: 0 });
     },
     setConfig: patch => set(s => ({ config: { ...s.config, ...patch } })),
     setLr: lr => { const { adam } = get(); if (adam) adam.opts.lr = lr; trainer?.send({ type: 'setLr', lr }); set({ lr }); },
@@ -102,17 +108,17 @@ export const useStore = create<State>()((set, get) => {
       if (!corpus) return;
       dropTrainer();
       const cfg = { ...config, seed: config.seed + 1 };
-      set({ config: cfg, ...freshModel(cfg, lr), history: [], trainError: null, trace: null, cursorIndex: -1, generated: null, selection: null, hover: null });
+      set({ config: cfg, ...freshModel(cfg, lr), history: [], trainError: null, trace: null, cursorIndex: -1, generated: null, traceWords: null, picked: null, selection: null, hover: null });
     },
 
-    setPrompt: prompt => set({ prompt }),
+    setPrompt: prompt => set({ prompt, generatedFrom: null, notice: null }),
     recordPrompt: () => {
       const { model, corpus, prompt, config } = get();
       if (!model || !corpus) return;
-      const { tokens, unknown } = promptTokens(prompt, corpus);
-      if (tokens.length === 0) { set({ promptUnknown: unknown }); return; }
+      const { words, tokens, unknown } = promptTokens(prompt, corpus);
+      if (tokens.length === 0) { set({ promptUnknown: unknown, notice: EMPTY_NOTICE }); return; }
       const trace = recordForward(model, tokens.slice(-config.contextSize));
-      set({ trace, cursorIndex: trace.steps.length - 1, promptUnknown: unknown, selection: null, hover: null, position: trace.ctx.T - 1 });
+      set({ trace, cursorIndex: trace.steps.length - 1, promptUnknown: unknown, traceWords: words.slice(-config.contextSize), picked: null, notice: null, selection: null, hover: null, position: trace.ctx.T - 1 });
     },
     recordTrainingTrace: () => {
       const { model, adam, corpus, config, nonce } = get();
@@ -121,7 +127,7 @@ export const useStore = create<State>()((set, get) => {
       const w = corpus.trainWindows[rng.int(corpus.trainWindows.length)];
       const trace = recordTrainingStep(model, adam, w);
       trainerStale = true;
-      set({ trace, cursorIndex: -1, nonce: nonce + 1, selection: null, hover: null, position: trace.ctx.T - 1 });
+      set({ trace, cursorIndex: -1, nonce: nonce + 1, traceWords: null, picked: null, selection: null, hover: null, position: trace.ctx.T - 1 });
     },
 
     seek: i => set({ cursorIndex: clampCursor(i) }),
@@ -144,16 +150,17 @@ export const useStore = create<State>()((set, get) => {
       else set({});
     },
     stepGenerate: () => {
-      const { model, corpus, prompt, sample, config, nonce } = get();
+      const { model, corpus, prompt, sample, config, nonce, generatedFrom } = get();
       if (!model || !corpus) return;
-      const { tokens, unknown } = promptTokens(prompt, corpus);
-      if (tokens.length === 0) { set({ promptUnknown: unknown }); return; }
+      const { words, tokens, unknown } = promptTokens(prompt, corpus);
+      if (tokens.length === 0) { set({ promptUnknown: unknown, notice: EMPTY_NOTICE }); return; }
       const trace = recordForward(model, tokens.slice(-config.contextSize));
       const L = get_(trace, T_.logits); const [rows, V] = L.shape;
       const { token } = sampleFromLogits(Float64Array.from(L.data.subarray((rows - 1) * V, rows * V)), sample, new Rng(config.seed * 7919 + nonce));
       const word = corpus.vocab.words[token];
       const glue = word === '\n' ? '' : prompt.endsWith('\n') || prompt.length === 0 ? '' : ' ';
-      set({ trace, cursorIndex: trace.steps.length - 1, prompt: prompt + glue + word, promptUnknown: unknown, nonce: nonce + 1, position: trace.ctx.T - 1, selection: null, hover: null });
+      set({ trace, cursorIndex: trace.steps.length - 1, prompt: prompt + glue + word, promptUnknown: unknown, nonce: nonce + 1, position: trace.ctx.T - 1, selection: null, hover: null,
+        traceWords: words.slice(-config.contextSize), picked: token, generatedFrom: generatedFrom ?? prompt.length, notice: null });
     },
     generateMore: n => {
       const { model, corpus, prompt, sample, config, nonce } = get();

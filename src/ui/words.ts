@@ -16,11 +16,13 @@ export function displayWord(w: string | undefined): string {
 /** The words behind a trace's tokens. For a forward trace recorded from the current prompt, the
  *  user's own spelling of unknown words is recovered from the prompt; otherwise the vocabulary
  *  word is used and unknown tokens read as "?". `known[i]` is false for an unknown token. */
-export function contextWords(trace: Trace, prompt: string, vocab: Vocab): { words: string[]; known: boolean[] } {
+export function contextWords(trace: Trace, prompt: string, vocab: Vocab, stored?: string[] | null): { words: string[]; known: boolean[] } {
   const T = trace.ctx.T;
   const known = trace.ctx.tokens.map(t => t !== 0);
   const fromVocab = trace.ctx.tokens.map(t => displayWord(vocab.words[t]));
   if (trace.kind !== 'forward') return { words: fromVocab, known };
+  // The store remembers the exact words a Step or recordPrompt ran on; that beats guessing from the prompt.
+  if (stored && stored.length === T) return { words: stored.map(displayWord), known };
   const pw = splitWords(prompt);
   // Step appends the guessed word to the prompt, so the context may end one word before the end.
   for (const drop of [0, 1]) {

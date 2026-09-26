@@ -17,7 +17,7 @@ export function drawLegend(g: CanvasRenderingContext2D, right: number, bottom: n
     rows.push({ swatch: bar(t => diverging(t * 2 - 1, 1)), text: 'negative  0  positive' });
     rows.push({ swatch: bar(t => sequential(t)), text: '0 to 1: attention, probabilities' });
   } else {
-    rows.push({ swatch: bar(t => gradientMap(t * 2 - 1, 1)), text: phase === 'backward' ? 'gradient: raise it lowers loss  /  raises loss' : 'update: moved down  /  moved up' });
+    rows.push({ swatch: bar(t => gradientMap(t * 2 - 1, 1)), text: phase === 'backward' ? 'gradient: raising this number lowers the loss  /  raises it' : 'update: moved down  /  moved up' });
   }
   rows.push({ swatch: square('#f5efe6', '#e08a1e', 2), text: 'learned numbers (training changes them)' });
   rows.push({ swatch: square('#f4f4f4', '#222', 1), text: 'numbers computed from the words' });
