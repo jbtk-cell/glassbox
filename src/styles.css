@@ -75,10 +75,11 @@ table { border-collapse: collapse; }
 .loss-wrap .loss-view { padding: 0; height: auto; }
 .network-view { width: 100%; height: 100%; position: relative; }
 
-.map-view { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.map-view { position: relative; width: 100%; height: 100%; overflow: hidden; touch-action: none; overscroll-behavior: contain; }
 .map-view canvas { display: block; }
 .map-zoom { position: absolute; top: 8px; left: 8px; display: flex; gap: 2px; }
-.map-zoom button { padding: 1px 8px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.map-zoom button { min-width: 30px; height: 28px; padding: 0 9px; font-family: ui-monospace, Menlo, monospace; font-size: 15px; line-height: 1; }
+.map-zoom button:last-child { font-size: 12px; }
 .map-view .tip { position: absolute; pointer-events: none; background: rgba(31,41,55,0.92); color: white; font: 12px ui-monospace, Menlo, monospace; padding: 4px 7px; border-radius: 4px; white-space: nowrap; }
 
 .seq-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 6px 8px; border-bottom: 1px solid #e4e4e4; background: #fafafa; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }

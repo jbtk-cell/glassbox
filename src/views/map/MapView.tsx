@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../app/store';
 import { mapLayout, TOP_LIST, type MapLayout, type MapSlot, type Rect } from './mapLayout';
 import { TileCache, cellAt, type TileMode } from '../tiles';
-import { toScreen, toWorld, zoomAt, pan, fit, type Camera } from '../camera';
+import { toScreen, toWorld, pan, fit, type Camera } from '../camera';
+import { usePanZoom, BUTTON_STEP } from '../usePanZoom';
 import { isMasked } from '../colormap';
 import { drawLegend, drawBanner } from '../legend';
 import { Cursor, type Status } from '../../engine/trace/cursor';
@@ -351,17 +352,16 @@ export function MapView() {
     else if (hh.kind === 'pred') select({ key: tKey(T_.probs), index: (trace.ctx.T - 1) * trace.ctx.tensors.get(T_.probs)!.shape[1] + hh.id });
     else setPosition(hh.t);
   };
-  const onWheel = (e: React.WheelEvent) => { const [sx, sy] = local(e); setCam(c => zoomAt(c, sx, sy, Math.pow(1.1, -e.deltaY / 100))); };
-  const zoomBy = (f: number) => { const { w, h } = size(); setCam(c => zoomAt(c, w / 2, h / 2, f)); };
+  const { zoomBy, onDoubleClick } = usePanZoom(wrapRef, setCam, fitAll);
 
   return (
     <div ref={wrapRef} className="map-view" data-cam={`${cam.x.toFixed(1)},${cam.y.toFixed(1)},${cam.zoom.toFixed(4)}`} style={{ cursor: drag.current ? 'grabbing' : 'default' }}
-      onMouseMove={onMove} onMouseDown={onDown} onMouseUp={onUp} onMouseLeave={() => { drag.current = null; setHover(null); setTip(null); }} onWheel={onWheel} onDoubleClick={fitAll}>
+      onMouseMove={onMove} onMouseDown={onDown} onMouseUp={onUp} onMouseLeave={() => { drag.current = null; setHover(null); setTip(null); }} onDoubleClick={onDoubleClick}>
       <canvas ref={canvasRef} />
       <div className="map-zoom">
-        <button onClick={() => zoomBy(1.3)} title="Zoom in">+</button>
-        <button onClick={() => zoomBy(1 / 1.3)} title="Zoom out">-</button>
-        <button onClick={fitAll} title="Fit everything in view">Fit</button>
+        <button onClick={() => zoomBy(BUTTON_STEP)} title="Zoom in (+ key, scroll up, or pinch)" aria-label="Zoom in">+</button>
+        <button onClick={() => zoomBy(1 / BUTTON_STEP)} title="Zoom out (- key, scroll down, or pinch)" aria-label="Zoom out">&minus;</button>
+        <button onClick={fitAll} title="Fit everything in view (0 key)">Fit</button>
       </div>
       {tip && <div className="tip" style={{ left: tip.x, top: tip.y }}>{tip.text}</div>}
     </div>
